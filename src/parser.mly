@@ -35,6 +35,8 @@
 %token WHILE
 %token EOF
 
+%token IDENT
+
 %start implementation
 %type <unit> implementation
 

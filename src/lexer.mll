@@ -43,9 +43,20 @@ let keyword_table =
     "volatile", VOLATILE;
     "while", WHILE;
 ]
-;;
 }
 
+let blank = [' ' '\t' '\n']
+let lowercase = ['a'-'z' '_']
+let uppercase = ['A'-'Z']
+let identchar = ['A'-'Z' 'a'-'z' '_' '0'-'9']
+
 rule token = parse
-  | eof { EOF }  
+  | blank 
+    { token lexbuf }
+  | lowercase identchar *
+    { let s = Lexing.lexeme lexbuf in
+      try Hashtbl.find keyword_table s
+      with Not_found -> Decl.lookupsym s }
+  | eof 
+    { EOF }  
 
