@@ -56,7 +56,12 @@ rule token = parse
   | lowercase identchar *
     { let s = Lexing.lexeme lexbuf in
       try Hashtbl.find keyword_table s
-      with Not_found -> Decl.lookupsym s }
+      with Not_found -> IDENT (Decl.lookup_symbol s) }
   | eof 
     { EOF }  
+  | "#" { token lexbuf }
+
+and pp_comment = parse
+  | "#" { token lexbuf }
+  
 

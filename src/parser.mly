@@ -35,7 +35,7 @@
 %token WHILE
 %token EOF
 
-%token IDENT
+%token <Decl.symbol> IDENT 
 
 %start implementation
 %type <unit> implementation

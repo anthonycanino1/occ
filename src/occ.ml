@@ -1,3 +1,9 @@
+(**************************************************************************)
+(*                                                                        *)
+(*                                 OCC                                    *)
+(*                                                                        *)
+(**************************************************************************)
+
 
 let odbg = ref false
 
@@ -8,10 +14,15 @@ let spec = [
 let usage = "usage: occ <options> <files>\nOptions are:"
 
 let compile file = 
-  let inchan = open_in file in
+  let ic = Preproc.preproc_file file in
+  let lexbuf = Lexing.from_channel ic in
+  let result = Parser.implementation Lexer.token lexbuf in
+  result
+  (*
   let lexbuf = Lexing.from_channel inchan in
   let result = Parser.implementation Lexer.token lexbuf in
   result
+  *)
 ;; 
 
 let _ = 
