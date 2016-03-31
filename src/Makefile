@@ -1,7 +1,7 @@
 all: occ
 
 occ:
-	ocamlbuild -use-ocamlfind occ.native
+	ocamlbuild -use-ocamlfind -lexflag -ml occ.native
 
 clean:
 	ocamlbuild -clean

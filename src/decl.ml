@@ -6,8 +6,12 @@
 type symbol = 
   {
     name: string;
-    decl: Node.node;
+    decl: node;
   }
+
+and node = 
+  | Nil
+  | Name of symbol
 
 type symbol_tag =
   | Mark
@@ -19,7 +23,7 @@ let symtab : (string, symbol) Hashtbl.t = Hashtbl.create 8
 let lookup_symbol name = 
   try Hashtbl.find symtab name 
   with Not_found -> 
-    let sym = {name= name; decl= Node.Nil;} in
+    let sym = {name= name; decl= Nil;} in
     Hashtbl.add symtab name sym ; sym
 
 

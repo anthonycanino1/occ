@@ -2,40 +2,23 @@
 %{
 %}
 
-/* Tokens */
-%token AUTO
-%token BREAK
-%token CASE
-%token CHAR
-%token CONST
-%token DEFAULT
-%token DO
-%token DOUBLE
-%token ELSE
-%token ENUM
-%token EXTERN
-%token FLOAT
-%token FOR
-%token GOTO
-%token IF
-%token INT
-%token LONG
-%token REGISTER
-%token RETURN
-%token SHORT
-%token SIGNED
-%token SIZEOF
-%token STRUCT
-%token SWITCH
-%token TYPEDEF
-%token UNION
-%token UNSIGNED
-%token VOID
-%token VOLATILE
-%token WHILE
-%token EOF
+/* Keywords */
+%token AUTO BREAK CASE CHAR CONST DEFAULT DO DOUBLE
+%token ELSE ENUM EXTERN FLOAT FOR GOTO IF INT LONG
+%token REGISTER RETURN SHORT SIGNED SIZEOF STRUCT
+%token SWITCH TYPEDEF UNION UNSIGNED VOID VOLATILE
+%token WHILE EOF
 
-%token <Decl.symbol> IDENT 
+/* Punctuators */
+%token LBRACK RBRACK LPAREN RPAREN LBRACE RBRACE DOT ARROW 
+%token INC DEC AND STAR PLUS MINUS NEG BANG DIV MOD XOR OR
+%token LSHIFT RSHIFT LT GT LTEQ GTEQ EQEQ NEQ ANDAND OROR
+%token TERNARY COLON SEMI DOTS EQ MULTEQ DIVEQ MODEQ PLUSEQ 
+%token MINUSEQ LSHIFTEQ RSHIFTEQ ANDEQ OREQ XOREQ COMMA
+
+%token <Type.value> STRLIT
+%token <Type.value> INTLIT
+%token <string> IDENT 
 
 %start implementation
 %type <unit> implementation
