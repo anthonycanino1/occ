@@ -8,13 +8,9 @@
 
 {
 open Lexing
-open Parser
+open Parser 
 
-type error = 
-  | Unterminated_string 
-;;
-
-exception Error of error;;
+open Errors
 
 let keyword_table =
   Misc.create_hashtable 30 [
@@ -93,7 +89,9 @@ type inttypetag =
 ;;
 
 (* Positioning *)
-(* let str_start_loc = ref Location.none;; *)
+
+(* TODO: Finish implementation: Need to properly parse the suffix,
+ * leaving reset_intlex for now *)
 let int_sign = ref Signed
 let int_type = ref Int 
 
@@ -105,16 +103,34 @@ let reset_intlex () =
  * an int value and give it the default 'int' type *)
 let convert_int tag (sign, typ) value = 
   match tag with
-  | Decimal -> 
-    Type.Intval (int_of_string value, Type.Int)
-  | Octal ->
-    Type.Intval (int_of_string ("0o" ^ value), Type.Int)
-  | Hexidecimal ->
-    Type.Intval (int_of_string ("0x" ^ value), Type.Int)
+  | Decimal -> Type.Intval (int_of_string value, Type.Int)
+  | Hexidecimal -> Type.Intval (int_of_string ("0x" ^ value), Type.Int)
+  | Octal -> Type.Intval (int_of_string ("0o" ^ value), Type.Int) 
+
+let convert_dec_float value =
+  Type.Floatval (float_of_string value, Type.Float)
+
+let convert_hex_float signf expn =
+  let rec convert_hex_float' signf len i acc =
+    if i >= len then acc
+    else 
+      let v = float_of_int (Misc.hex_to_int signf.[i]) in 
+      let v' = v /. (float_of_int (Misc.pow 16 (i+1))) in
+      convert_hex_float' signf len (i+1) (acc+.v')
+  in 
+  let l,r = Misc.split_fractional signf in
+  let v = float_of_int (int_of_string ("0x" ^ l)) in
+  let v' = convert_hex_float' r (String.length r) 0 v in
+  if expn == "" then
+    Type.Floatval (v', Type.Float)
+  else
+    let v'' = v' *. (2. ** float_of_int (int_of_string (Misc.chop expn))) in
+    Type.Floatval (v'', Type.Float) 
 
 let dump_token t =
   match t with
   | (Parser.INTLIT (Type.Intval (i,t))) -> Printf.printf "INTLIT:%d\n" i
+  | (Parser.FLOATLIT (Type.Floatval (i,t))) -> Printf.printf "FLOATLIT:%f\n" i
   | (Parser.STRLIT (Type.Strval s)) -> Printf.printf "STRLIT:%s\n" s
   | (Parser.IDENT s) -> Printf.printf "IDENT:%s\n" s
   | Parser.LBRACK -> Printf.printf "LBRACK\n"
@@ -173,52 +189,69 @@ let lowercase = ['a'-'z' '_']
 let uppercase = ['A'-'Z']
 let identchar = ['A'-'Z' 'a'-'z' '_' '0'-'9']
 
+let hex_preffix = "0" ['x' 'X']
+
 let octal_digit = ['0'-'7']
 let hex_digit = ['0'-'9' 'a'-'f' 'A'-'F']
 let dec_digit_start = ['1'-'9']
-let dec_digit_part = ['0'-'9']
+let dec_digit = ['0'-'9']
 
 let unsigned_suffix = ['u' 'U']
 let signed_suffix = ['l' 'L']
-
 let int_suffix = (unsigned_suffix signed_suffix? | 
                   unsigned_suffix signed_suffix signed_suffix? | 
                   signed_suffix unsigned_suffix? | 
                   signed_suffix signed_suffix unsigned_suffix? )
-let octal_const = "0" octal_digit *
-let hex_const = "0" ("x"|"X") hex_digit *
-let dec_const = (dec_digit_start dec_digit_part * | "0")
+
+let frac_const = (dec_digit * "." dec_digit +) | dec_digit + "."
+let expon_part = ['e' 'E'] ['+' '-']? dec_digit +
+
+let hex_frac_const = (hex_digit * "." hex_digit +) | hex_digit + "."
+let bin_expon_part = ['p' 'P'] ['+' '-']? dec_digit + 
+
+let float_suff = ['f' 'F' 'l' 'L']
 
 rule ltoken = parse
   | blank +
     { ltoken lexbuf }
+
   | "//" [^'\n'] * "\n"
     { ltoken lexbuf }
+
   | "/*" _ * "*/" 
     { ltoken lexbuf }
+
   | "#" [^'\n'] * "\n"
     { ltoken lexbuf }
-  | "0" ((octal_digit *) as value)
+
+  | "0" ((octal_digit *) as v) int_suffix?
     { reset_intlex() ;
-      lint lexbuf ;
-      INTLIT (convert_int Octal (!int_sign, !int_type) value) }
-  | "0" ("x"|"X") ((hex_digit *) as value)
+      INTLIT (convert_int Octal (!int_sign, !int_type) v) }
+
+  | hex_preffix ((hex_digit *) as v) int_suffix? 
     { reset_intlex() ;
-      lint lexbuf ;
-      INTLIT (convert_int Hexidecimal (!int_sign, !int_type) value) }
-  | ((dec_digit_start dec_digit_part * | "0") as value) 
+      INTLIT (convert_int Hexidecimal (!int_sign, !int_type) v) }
+
+  | ((dec_digit_start dec_digit * | "0") as v) int_suffix? 
     { reset_intlex() ;
-      lint lexbuf ;
-      INTLIT (convert_int Decimal (!int_sign, !int_type) value) }
+      INTLIT (convert_int Decimal (!int_sign, !int_type) v) }
+
+  | ((frac_const expon_part?) | (dec_digit + expon_part) as v) float_suff? 
+    { FLOATLIT (convert_dec_float v) } 
+
+  | hex_preffix ((hex_frac_const as s) (bin_expon_part as e) | ((hex_digit+) as s) (bin_expon_part as e) ) float_suff?
+    { FLOATLIT (convert_hex_float s e ) } 
+
   | lowercase identchar *
     { let s = Lexing.lexeme lexbuf in
       try Hashtbl.find keyword_table s
       with Not_found -> IDENT s } 
+
   | "\""
     { reset_strbuf() ;
-      (* str_start_loc := Location.curr lexbuf; *)
       lstring lexbuf ; 
       STRLIT (Type.Strval (get_strbuf())) }
+
   | "[" { LBRACK }
   | "]" { RBRACK }
   | "(" { LPAREN }
@@ -268,8 +301,7 @@ rule ltoken = parse
   | eof { EOF }  
 
 and lstring = parse
-  | "\""
-    { () }
+  | "\"" { () }
   | "\\" ['\\' '\'' '\"' 'n']
     { store_strchar (Lexing.lexeme_char lexbuf 0) ; 
       store_strchar (Lexing.lexeme_char lexbuf 1) ;
@@ -279,12 +311,3 @@ and lstring = parse
       lstring lexbuf }
   | eof
     { raise (Error (Unterminated_string)) }
-
-and lint = parse
-  | [^ 'u' 'U' 'l' 'L'] { () }
-  | "u" | "U" { int_sign := Unsigned; lint lexbuf  }
-  | "l" | "L" { int_type := Long; lint lexbuf }
-  | "ll" | "LL" { int_type := Long_Long; lint lexbuf }
-    
-
-

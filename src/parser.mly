@@ -18,6 +18,7 @@
 
 %token <Type.value> STRLIT
 %token <Type.value> INTLIT
+%token <Type.value> FLOATLIT
 %token <string> IDENT 
 
 %start implementation

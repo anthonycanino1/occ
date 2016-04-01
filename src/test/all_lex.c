@@ -25,7 +25,7 @@
 // abc123
 
 // Integer Constants
- 123 
+// 123 
 // 123u 123U 
 // 123l 123L 
 // 123lu 123Lu 123ul 123uL
@@ -34,9 +34,31 @@
 // 123llu 123LLu 123ull 123uLL
 // 123llU 123LLU 123Ull 123ULL
 
- 0x10 0x1a 0xff
- 017 027
+// 0x10 0x1a 0xff
+// 017 027
 
+// Float Constants
+// 1. .1 1.1
+// 1e2 .1e2 1.1e2
+// 1e+2 .1e+2 1.1e+2
+// 1e-2 .1e-2 1.1e-2
+
+// 1.f .1f 1.1f
+// 1.l .1l 1.1l
+
+0x.ap0    // 0.625
+0x.ap1    // 1.25
+0x.ap2    // 2.5
+0x.a1p0   // 0.62896
+0x.ap-1   // 0.314453
+0x.ap-2   // 0.156250
+0x.afp0   // 0.683594
+0x.afp4   // 10.937500
+0xap2     // 40.0
+0xap-2    // 2.5
+
+// 0xa.f 0x.ap2f 0xa.ap2f
+// 0xa.l 0x.ap2l 0xa.ap2l
 
 
 // Strings
