@@ -16,6 +16,8 @@
 %token TERNARY COLON SEMI DOTS EQ MULTEQ DIVEQ MODEQ PLUSEQ 
 %token MINUSEQ LSHIFTEQ RSHIFTEQ ANDEQ OREQ XOREQ COMMA
 
+%token <Type.value> RUNELIT
+%token <Type.value> CHARLIT
 %token <Type.value> STRLIT
 %token <Type.value> INTLIT
 %token <Type.value> FLOATLIT

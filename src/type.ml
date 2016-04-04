@@ -24,5 +24,5 @@ type value =
   | Strval of string
   | Intval of int * inttype
   | Floatval of float * floattype
-
-
+  | Charval of string
+  | Runeval of int 

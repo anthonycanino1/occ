@@ -46,24 +46,33 @@
 // 1.f .1f 1.1f
 // 1.l .1l 1.1l
 
-0x.ap0    // 0.625
-0x.ap1    // 1.25
-0x.ap2    // 2.5
-0x.a1p0   // 0.62896
-0x.ap-1   // 0.314453
-0x.ap-2   // 0.156250
-0x.afp0   // 0.683594
-0x.afp4   // 10.937500
-0xap2     // 40.0
-0xap-2    // 2.5
+//0x.ap0    // 0.625
+//0x.ap1    // 1.25
+//0x.ap2    // 2.5
+//0x.a1p0   // 0.62896
+//0x.ap-1   // 0.314453
+//0x.ap-2   // 0.156250
+//0x.afp0   // 0.683594
+//0x.afp4   // 10.937500
+//0xap2     // 40.0
+//0xap-2    // 2.5
 
 // 0xa.f 0x.ap2f 0xa.ap2f
 // 0xa.l 0x.ap2l 0xa.ap2l
 
+// Runes
+// 'À'
 
 // Strings
 // "simple string"
 // "simple string with newline\n"
 // "simple escaped \" string"
 // "simple escaped \\ string"
+"String with unicode À"
+"Two Code Point:\u00a2"
+"Three Code Point:\u20ac"
+"Four Code Point:\U00010348"
+
+"alpha:α beta:β gamma:γ"
+"alpha:\u03b1 beta:\u03b2 gamma:\u03b3"
 

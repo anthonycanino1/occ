@@ -55,6 +55,18 @@ let reset_strbuf () =
   strbuf := init_strbuf ; 
   strind := 0
 
+let store_strrune r = 
+  let rbuf = Rune.bytes r in
+  let rlen = Bytes.length rbuf in
+  if !strind + rlen >= Bytes.length !strbuf then begin
+    let newlen = (Bytes.length (!strbuf)) * 2 in
+    let newbuf = Bytes.create newlen in
+    Bytes.blit !strbuf 0 newbuf 0 (Bytes.length !strbuf) ;
+    strbuf := newbuf
+  end;
+  Bytes.blit rbuf 0 !strbuf !strind rlen ;
+  strind := !strind + rlen 
+
 let store_strchar c =
   if !strind >= Bytes.length !strbuf then begin
     let newlen = (Bytes.length (!strbuf)) * 2 in
@@ -211,6 +223,8 @@ let bin_expon_part = ['p' 'P'] ['+' '-']? dec_digit +
 
 let float_suff = ['f' 'F' 'l' 'L']
 
+let hex_quad = hex_digit hex_digit hex_digit hex_digit 
+
 rule ltoken = parse
   | blank +
     { ltoken lexbuf }
@@ -246,6 +260,8 @@ rule ltoken = parse
     { let s = Lexing.lexeme lexbuf in
       try Hashtbl.find keyword_table s
       with Not_found -> IDENT s } 
+
+  | "'"
 
   | "\""
     { reset_strbuf() ;
@@ -306,8 +322,22 @@ and lstring = parse
     { store_strchar (Lexing.lexeme_char lexbuf 0) ; 
       store_strchar (Lexing.lexeme_char lexbuf 1) ;
       lstring lexbuf } 
+  | "\\" "u" (hex_quad as rune)
+    { 
+      let rune_bytes = int_of_string ("0x" ^ rune) in
+      let rune = Rune.create rune_bytes in
+      store_strrune rune ;
+      lstring lexbuf } 
+  | "\\" "U" (hex_quad hex_quad as rune)
+    { 
+      let rune_bytes = int_of_string ("0x" ^ rune) in
+      let rune = Rune.create rune_bytes in
+      store_strrune rune ;
+      lstring lexbuf } 
+
   | _ 
-    { store_strchar (Lexing.lexeme_char lexbuf 0) ;
+    { 
+      store_strchar (Lexing.lexeme_char lexbuf 0) ;
       lstring lexbuf }
   | eof
     { raise (Error (Unterminated_string)) }
