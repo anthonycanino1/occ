@@ -143,6 +143,25 @@ let is_rune c =
   let byte = int_of_char c in
   if (byte land 0x80) != 0 then true else false
 
+let simple_esc_code c = 
+  let raw_esc_code c =
+    match c with
+    | '\''  -> 0x27
+    | '"'   -> 0x22
+    | '?'   -> 0x3f
+    | '\\'  -> 0x5c
+    | 'a'   -> 0x07
+    | 'b'   -> 0x08
+    | 'f'   -> 0x0c
+    | 'n'   -> 0x0a
+    | 'r'   -> 0x0d
+    | 't'   -> 0x09
+    | 'v'   -> 0x0b
+    | _     -> raise (Error (Internal)) 
+  in Char.chr (raw_esc_code c)
+
+let simple_esc_char c = String.make 1 (simple_esc_code c)
+  
 let dump_token t =
   match t with
   | (Parser.INTLIT (Type.Intval (i,t))) -> Printf.printf "INTLIT:%d\n" i
@@ -231,6 +250,8 @@ let float_suff = ['f' 'F' 'l' 'L']
 
 let hex_quad = hex_digit hex_digit hex_digit hex_digit 
 
+let simple_escape = ['\'' '"' '?' '\\' 'a' 'b' 'f' 'n' 't' 'v']
+
 rule ltoken = parse
   | blank +
     { ltoken lexbuf }
@@ -272,6 +293,9 @@ rule ltoken = parse
 
   | "'\\U" (hex_quad hex_quad as rune) "'"
     { RUNELIT (Type.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
+
+  | "'\\" (simple_escape as esc) "'"
+    { CHARLIT (Type.Charval (simple_esc_char esc)) }
 
   | "'" ([^ '\'' '\\'] * as lit)  "'"
     { if is_rune lit.[0] then 
@@ -339,9 +363,8 @@ rule ltoken = parse
 
 and lstring = parse
   | "\"" { () }
-  | "\\" ['\\' '\'' '\"' 'n']
-    { store_strchar (Lexing.lexeme_char lexbuf 0) ; 
-      store_strchar (Lexing.lexeme_char lexbuf 1) ;
+  | "\\" (simple_escape as esc)
+    { store_strchar (simple_esc_code esc) ;
       lstring lexbuf } 
   | "\\" "u" (hex_quad as quad)
     { 

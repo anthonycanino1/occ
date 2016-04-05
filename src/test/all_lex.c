@@ -62,21 +62,24 @@
 
 // Chars
 'a'
+'\n'
+'\t'
+'\?'
 
 // Runes
-//'\u00a2'
-//'\u20ac'
-//'\U00010348'
+'\u00a2'
+'\u20ac'
+'\U00010348'
 '¢'
 '€'
 '𐍈'
 '⌘'
 
 // Strings
-// "simple string"
-// "simple string with newline\n"
-// "simple escaped \" string"
-// "simple escaped \\ string"
+ "simple string"
+ "simple string with newline\n"
+ "simple escaped \" string"
+ "simple escaped \\ string"
 "String with unicode À"
 "Two Code Point:\u00a2"
 "Three Code Point:\u20ac"
