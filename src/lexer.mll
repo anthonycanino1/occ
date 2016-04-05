@@ -56,7 +56,7 @@ let reset_strbuf () =
   strind := 0
 
 let store_strrune r = 
-  let rbuf = Rune.bytes r in
+  let rbuf = Rune.to_bytes r in
   let rlen = Bytes.length rbuf in
   if !strind + rlen >= Bytes.length !strbuf then begin
     let newlen = (Bytes.length (!strbuf)) * 2 in
@@ -139,11 +139,17 @@ let convert_hex_float signf expn =
     let v'' = v' *. (2. ** float_of_int (int_of_string (Misc.chop expn))) in
     Type.Floatval (v'', Type.Float) 
 
+let is_rune c =
+  let byte = int_of_char c in
+  if (byte land 0x80) != 0 then true else false
+
 let dump_token t =
   match t with
   | (Parser.INTLIT (Type.Intval (i,t))) -> Printf.printf "INTLIT:%d\n" i
   | (Parser.FLOATLIT (Type.Floatval (i,t))) -> Printf.printf "FLOATLIT:%f\n" i
   | (Parser.STRLIT (Type.Strval s)) -> Printf.printf "STRLIT:%s\n" s
+  | (Parser.RUNELIT (Type.Runeval s)) -> Printf.printf "RUNELIT:%s\n" (Rune.to_string s)
+  | (Parser.CHARLIT (Type.Charval s)) -> Printf.printf "CHARLIT:%s\n" s
   | (Parser.IDENT s) -> Printf.printf "IDENT:%s\n" s
   | Parser.LBRACK -> Printf.printf "LBRACK\n"
   | Parser.RBRACK -> Printf.printf "RBRACK\n"
@@ -261,7 +267,22 @@ rule ltoken = parse
       try Hashtbl.find keyword_table s
       with Not_found -> IDENT s } 
 
-  | "'"
+  | "'\\u" (hex_quad as rune) "'"
+    { RUNELIT (Type.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
+
+  | "'\\U" (hex_quad hex_quad as rune) "'"
+    { RUNELIT (Type.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
+
+  | "'" ([^ '\'' '\\'] * as lit)  "'"
+    { if is_rune lit.[0] then 
+        let bytes = Bytes.of_string lit in
+        RUNELIT (Type.Runeval (Rune.from_sequence bytes)) 
+      else
+        if String.length lit == 1 then 
+          CHARLIT (Type.Charval lit)
+        else
+          raise (Error (Invalid_char))
+    }
 
   | "\""
     { reset_strbuf() ;
@@ -322,22 +343,22 @@ and lstring = parse
     { store_strchar (Lexing.lexeme_char lexbuf 0) ; 
       store_strchar (Lexing.lexeme_char lexbuf 1) ;
       lstring lexbuf } 
-  | "\\" "u" (hex_quad as rune)
+  | "\\" "u" (hex_quad as quad)
     { 
-      let rune_bytes = int_of_string ("0x" ^ rune) in
-      let rune = Rune.create rune_bytes in
-      store_strrune rune ;
-      lstring lexbuf } 
-  | "\\" "U" (hex_quad hex_quad as rune)
-    { 
-      let rune_bytes = int_of_string ("0x" ^ rune) in
-      let rune = Rune.create rune_bytes in
-      store_strrune rune ;
-      lstring lexbuf } 
-
+      let rune = int_of_string ("0x" ^ quad) in
+      store_strrune (Rune.from_rune rune) ;
+      lstring lexbuf 
+    } 
+  | "\\" "U" (hex_quad hex_quad as quad)
+    { let rune = int_of_string ("0x" ^ quad) in
+      if Rune.is_valid_rune rune then begin
+        store_strrune (Rune.from_rune rune) ;
+        lstring lexbuf
+        end
+      else 
+        raise (Error (Invalid_rune)) } 
   | _ 
-    { 
-      store_strchar (Lexing.lexeme_char lexbuf 0) ;
+    { store_strchar (Lexing.lexeme_char lexbuf 0) ;
       lstring lexbuf }
   | eof
     { raise (Error (Unterminated_string)) }

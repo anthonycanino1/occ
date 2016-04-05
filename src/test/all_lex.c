@@ -60,8 +60,17 @@
 // 0xa.f 0x.ap2f 0xa.ap2f
 // 0xa.l 0x.ap2l 0xa.ap2l
 
+// Chars
+'a'
+
 // Runes
-// 'À'
+//'\u00a2'
+//'\u20ac'
+//'\U00010348'
+'¢'
+'€'
+'𐍈'
+'⌘'
 
 // Strings
 // "simple string"

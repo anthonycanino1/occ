@@ -25,4 +25,4 @@ type value =
   | Intval of int * inttype
   | Floatval of float * floattype
   | Charval of string
-  | Runeval of int 
+  | Runeval of Rune.t 
