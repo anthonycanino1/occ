@@ -3,7 +3,7 @@
 (*                                 OCC                                    *)
 (*                                                                        *)
 (**************************************************************************)
-open Errors
+exception Internal_error of string
 
 let create_hashtable size init = 
   let tbl = Hashtbl.create size in
@@ -41,7 +41,7 @@ let hex_to_int h =
   | 'D' -> 13
   | 'E' -> 14
   | 'F' -> 15
-  | _   -> raise (Error (Internal))
+  | _   -> raise (Internal_error "invalid hex to int conversion")
 
 let split_fractional s =
   try 

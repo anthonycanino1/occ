@@ -1,5 +1,6 @@
 /* The parser definition */
 %{
+
 %}
 
 /* Keywords */
@@ -16,6 +17,9 @@
 %token TERNARY COLON SEMI DOTS EQ MULTEQ DIVEQ MODEQ PLUSEQ 
 %token MINUSEQ LSHIFTEQ RSHIFTEQ ANDEQ OREQ XOREQ COMMA
 
+/* Extra */
+%token UNKNOWN
+
 %token <Type.value> RUNELIT
 %token <Type.value> CHARLIT
 %token <Type.value> STRLIT
@@ -28,6 +32,7 @@
 
 %%
 implementation:
-  EOF { () }
+  CHARLIT { () }
+  | error { () }
 ;
 

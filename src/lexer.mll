@@ -10,7 +10,18 @@
 open Lexing
 open Parser 
 
-open Errors
+type error = 
+  | Invalid_char
+  | Invalid_rune
+  | Invalid_sequence
+  | Unterminated_string 
+
+let report_error err loc = 
+  match err with
+  | Invalid_char -> Compile.Errors.errorf Compile.errors loc "invalid chararacter literal."  
+  | Invalid_rune -> Compile.Errors.errorf Compile.errors loc "invalid rune literal."  
+  | Invalid_sequence -> Compile.Errors.errorf Compile.errors loc "invalid rune sequence."  
+  | Unterminated_string -> Compile.Errors.errorf Compile.errors loc "unterminated string."  
 
 let keyword_table =
   Misc.create_hashtable 30 [
@@ -157,7 +168,7 @@ let simple_esc_code c =
     | 'r'   -> 0x0d
     | 't'   -> 0x09
     | 'v'   -> 0x0b
-    | _     -> raise (Error (Internal)) 
+    | _     -> raise (Misc.Internal_error "invalid escape code")
   in Char.chr (raw_esc_code c)
 
 let simple_esc_char c = String.make 1 (simple_esc_code c)
@@ -298,15 +309,17 @@ rule ltoken = parse
     { CHARLIT (Type.Charval (simple_esc_char esc)) }
 
   | "'" ([^ '\'' '\\'] * as lit)  "'"
-    { if is_rune lit.[0] then 
-        let bytes = Bytes.of_string lit in
-        RUNELIT (Type.Runeval (Rune.from_sequence bytes)) 
-      else
-        if String.length lit == 1 then 
-          CHARLIT (Type.Charval lit)
-        else
-          raise (Error (Invalid_char))
-    }
+    { match () with
+      | () when is_rune lit.[0] -> begin
+        try
+          let bytes = Bytes.of_string lit in
+          RUNELIT (Type.Runeval (Rune.from_sequence bytes)) 
+        with (Rune.Invalid_sequence _) -> 
+          report_error Invalid_rune (Location.curr lexbuf) ;
+          UNKNOWN
+        end
+      | () when String.length lit == 1 -> CHARLIT (Type.Charval lit)
+      | _ -> report_error Invalid_char (Location.curr lexbuf) ; UNKNOWN }
 
   | "\""
     { reset_strbuf() ;
@@ -360,6 +373,8 @@ rule ltoken = parse
   | "|=" { OREQ }
   | "^=" { XOREQ }
   | eof { EOF }  
+  | _ { UNKNOWN }
+
 
 and lstring = parse
   | "\"" { () }
@@ -379,9 +394,9 @@ and lstring = parse
         lstring lexbuf
         end
       else 
-        raise (Error (Invalid_rune)) } 
+        report_error Invalid_rune (Location.curr lexbuf) } 
   | _ 
     { store_strchar (Lexing.lexeme_char lexbuf 0) ;
       lstring lexbuf }
   | eof
-    { raise (Error (Unterminated_string)) }
+    { report_error Unterminated_string (Location.curr lexbuf) }

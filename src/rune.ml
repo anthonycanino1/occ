@@ -1,4 +1,4 @@
-open Errors
+exception Invalid_sequence of string
 
 type pointtag =
   | Two
@@ -21,7 +21,7 @@ let from_rune r =
     create r Three
   | () when r >= 0x10000 && r <= 0x1fffff ->
     create r Four
-  | _ -> raise (Error (Internal))
+  | _ -> raise (Misc.Internal_error "invalid rune")
 
 let from_sequence bytes = 
   let len = Bytes.length bytes in
@@ -31,14 +31,14 @@ let from_sequence bytes =
     let b2 = (Char.code bytes.[1]) in
     let rune = ((b1 land 0x1f) lsl 6) lor (b2 land 0x3f) in
     if is_valid_rune rune then from_rune rune
-    else raise (Error (Invalid_sequence))
+    else raise (Invalid_sequence "")
   | () when len == 3 ->
     let b1 = (Char.code bytes.[0]) in
     let b2 = (Char.code bytes.[1]) in
     let b3 = (Char.code bytes.[2]) in
     let rune = ((b1 land 0x0f) lsl 12) lor ((b2 land 0x3f) lsl 6) lor (b3 land 0x3f) in
     if is_valid_rune rune then from_rune rune
-    else raise (Error (Invalid_sequence))
+    else raise (Invalid_sequence "")
   | () when len == 4 ->
     let b1 = (Char.code bytes.[0]) in
     let b2 = (Char.code bytes.[1]) in
@@ -46,9 +46,9 @@ let from_sequence bytes =
     let b4 = (Char.code bytes.[3]) in
     let rune = ((b1 land 0x07) lsl 18) lor ((b2 land 0x3f) lsl 12) lor ((b3 land 0x3f) lsl 6) lor (b4 land 0x3f) in
     if is_valid_rune rune then from_rune rune
-    else raise (Error (Invalid_sequence))
+    else raise (Invalid_sequence "")
   | _ ->
-    raise (Error (Invalid_sequence)) 
+    raise (Invalid_sequence "")
 
 let to_bytes (r,t) =
   match t with

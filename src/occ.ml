@@ -3,9 +3,6 @@
 (*                                 OCC                                    *)
 (*                                                                        *)
 (**************************************************************************)
-
-exception Found_eof
-
 let odbg = ref false
 
 let spec = [
@@ -14,6 +11,15 @@ let spec = [
 
 let usage = "usage: occ <options> <files>\nOptions are:"
 
+let compile file = 
+  Location.curr_file := file ;
+  let ic = Preproc.preproc_file file in
+  let lexbuf = Lexing.from_channel ic in
+  Parser.implementation Lexer.ltoken lexbuf ;
+  if Compile.Errors.length Compile.errors > 0 then 
+    (Compile.Errors.dump Compile.errors)
+
+(*
 let compile file = 
   let ic = Preproc.preproc_file file in
   let lexbuf = Lexing.from_channel ic in
@@ -24,6 +30,7 @@ let compile file =
       if t = Parser.EOF then raise Found_eof
     done
   with Found_eof -> ()
+*)
 
 let _ = 
   Arg.parse spec compile usage
