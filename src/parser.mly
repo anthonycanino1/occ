@@ -32,7 +32,12 @@
 
 %%
 implementation:
-  CHARLIT { () }
+    pexpr { () }
   | error { () }
 ;
+
+/* Expressions */
+pexpr:
+    IDENT { Ast.Nil }
+;  
 

@@ -126,12 +126,12 @@ let reset_intlex () =
  * an int value and give it the default 'int' type *)
 let convert_int tag (sign, typ) value = 
   match tag with
-  | Decimal -> Type.Intval (int_of_string value, Type.Int)
-  | Hexidecimal -> Type.Intval (int_of_string ("0x" ^ value), Type.Int)
-  | Octal -> Type.Intval (int_of_string ("0o" ^ value), Type.Int) 
+  | Decimal -> Type.Intval (int_of_string value, Type.Int32)
+  | Hexidecimal -> Type.Intval (int_of_string ("0x" ^ value), Type.Int32)
+  | Octal -> Type.Intval (int_of_string ("0o" ^ value), Type.Int32) 
 
 let convert_dec_float value =
-  Type.Floatval (float_of_string value, Type.Float)
+  Type.Floatval (float_of_string value, Type.Float32)
 
 let convert_hex_float signf expn =
   let rec convert_hex_float' signf len i acc =
@@ -145,10 +145,10 @@ let convert_hex_float signf expn =
   let v = float_of_int (int_of_string ("0x" ^ l)) in
   let v' = convert_hex_float' r (String.length r) 0 v in
   if expn == "" then
-    Type.Floatval (v', Type.Float)
+    Type.Floatval (v', Type.Float32)
   else
     let v'' = v' *. (2. ** float_of_int (int_of_string (Misc.chop expn))) in
-    Type.Floatval (v'', Type.Float) 
+    Type.Floatval (v'', Type.Float32) 
 
 let is_rune c =
   let byte = int_of_char c in

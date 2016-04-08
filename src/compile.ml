@@ -1,8 +1,7 @@
-(**************************************************************************)
-(*                                                                        *)
-(*                                 OCC                                    *)
-(*                                                                        *)
-(**************************************************************************)
+(* Copyright 2016 The OCC Authors. All rights reserved. 
+   Use of this source is governed by a BSD-style license
+   located in the LICENSE file. *)
+
 module Errors = struct
   type t = (string list) ref 
 
