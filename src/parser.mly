@@ -20,11 +20,11 @@
 /* Extra */
 %token UNKNOWN
 
-%token <Type.value> RUNELIT
-%token <Type.value> CHARLIT
-%token <Type.value> STRLIT
-%token <Type.value> INTLIT
-%token <Type.value> FLOATLIT
+%token <Ast.value> RUNELIT
+%token <Ast.value> CHARLIT
+%token <Ast.value> STRLIT
+%token <Ast.value> INTLIT
+%token <Ast.value> FLOATLIT
 %token <string> IDENT 
 
 %start implementation

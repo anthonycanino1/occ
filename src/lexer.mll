@@ -10,6 +10,8 @@
 open Lexing
 open Parser 
 
+open Ast
+
 type error = 
   | Invalid_char
   | Invalid_rune
@@ -126,12 +128,12 @@ let reset_intlex () =
  * an int value and give it the default 'int' type *)
 let convert_int tag (sign, typ) value = 
   match tag with
-  | Decimal -> Type.Intval (int_of_string value, Type.Int32)
-  | Hexidecimal -> Type.Intval (int_of_string ("0x" ^ value), Type.Int32)
-  | Octal -> Type.Intval (int_of_string ("0o" ^ value), Type.Int32) 
+  | Decimal -> Intval (int_of_string value, {typ=TInt32; quals=[Const]})
+  | Hexidecimal -> Intval (int_of_string ("0x" ^ value), {typ=TInt32; quals=[Const]})
+  | Octal -> Intval (int_of_string ("0o" ^ value), {typ=TInt32; quals=[Const]}) 
 
 let convert_dec_float value =
-  Type.Floatval (float_of_string value, Type.Float32)
+  Floatval (float_of_string value, {typ=TFloat32; quals=[Const]})
 
 let convert_hex_float signf expn =
   let rec convert_hex_float' signf len i acc =
@@ -145,10 +147,10 @@ let convert_hex_float signf expn =
   let v = float_of_int (int_of_string ("0x" ^ l)) in
   let v' = convert_hex_float' r (String.length r) 0 v in
   if expn == "" then
-    Type.Floatval (v', Type.Float32)
+    Floatval (v', {typ=TFloat32; quals=[Const]})
   else
     let v'' = v' *. (2. ** float_of_int (int_of_string (Misc.chop expn))) in
-    Type.Floatval (v'', Type.Float32) 
+    Floatval (v'', {typ=TFloat32; quals=[Const];}) 
 
 let is_rune c =
   let byte = int_of_char c in
@@ -175,11 +177,11 @@ let simple_esc_char c = String.make 1 (simple_esc_code c)
   
 let dump_token t =
   match t with
-  | (Parser.INTLIT (Type.Intval (i,t))) -> Printf.printf "INTLIT:%d\n" i
-  | (Parser.FLOATLIT (Type.Floatval (i,t))) -> Printf.printf "FLOATLIT:%f\n" i
-  | (Parser.STRLIT (Type.Strval s)) -> Printf.printf "STRLIT:%s\n" s
-  | (Parser.RUNELIT (Type.Runeval s)) -> Printf.printf "RUNELIT:%s\n" (Rune.to_string s)
-  | (Parser.CHARLIT (Type.Charval s)) -> Printf.printf "CHARLIT:%s\n" s
+  | (Parser.INTLIT (Ast.Intval (i,t))) -> Printf.printf "INTLIT:%d\n" i
+  | (Parser.FLOATLIT (Ast.Floatval (i,t))) -> Printf.printf "FLOATLIT:%f\n" i
+  | (Parser.STRLIT (Ast.Strval s)) -> Printf.printf "STRLIT:%s\n" s
+  | (Parser.RUNELIT (Ast.Runeval s)) -> Printf.printf "RUNELIT:%s\n" (Rune.to_string s)
+  | (Parser.CHARLIT (Ast.Charval s)) -> Printf.printf "CHARLIT:%s\n" s
   | (Parser.IDENT s) -> Printf.printf "IDENT:%s\n" s
   | Parser.LBRACK -> Printf.printf "LBRACK\n"
   | Parser.RBRACK -> Printf.printf "RBRACK\n"
@@ -300,31 +302,31 @@ rule ltoken = parse
       with Not_found -> IDENT s } 
 
   | "'\\u" (hex_quad as rune) "'"
-    { RUNELIT (Type.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
+    { RUNELIT (Ast.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
 
   | "'\\U" (hex_quad hex_quad as rune) "'"
-    { RUNELIT (Type.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
+    { RUNELIT (Ast.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
 
   | "'\\" (simple_escape as esc) "'"
-    { CHARLIT (Type.Charval (simple_esc_char esc)) }
+    { CHARLIT (Ast.Charval (simple_esc_char esc)) }
 
   | "'" ([^ '\'' '\\'] * as lit)  "'"
     { match () with
       | () when is_rune lit.[0] -> begin
         try
           let bytes = Bytes.of_string lit in
-          RUNELIT (Type.Runeval (Rune.from_sequence bytes)) 
+          RUNELIT (Ast.Runeval (Rune.from_sequence bytes)) 
         with (Rune.Invalid_sequence _) -> 
           report_error Invalid_rune (Location.curr lexbuf) ;
           UNKNOWN
         end
-      | () when String.length lit == 1 -> CHARLIT (Type.Charval lit)
+      | () when String.length lit == 1 -> CHARLIT (Ast.Charval lit)
       | _ -> report_error Invalid_char (Location.curr lexbuf) ; UNKNOWN }
 
   | "\""
     { reset_strbuf() ;
       lstring lexbuf ; 
-      STRLIT (Type.Strval (get_strbuf())) }
+      STRLIT (Ast.Strval (get_strbuf())) }
 
   | "[" { LBRACK }
   | "]" { RBRACK }
