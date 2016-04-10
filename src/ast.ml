@@ -2,12 +2,6 @@
    Use of this source is governed by a BSD-style license
    located in the LICENSE file. *)
 
-type store_spec =
-  | Auto
-  | Extern
-  | Register
-  | Static 
-
 type unary_op =
   | Pre_inc
   | Post_inc
@@ -38,18 +32,35 @@ type binary_op =
   | Bool_gt
   | Bool_gteq
 
+type store_spec =
+  | Auto_sto
+  | Extern_sto
+  | Register_sto
+  | Static_sto 
+  | Typedef_sto
+
 type type_qual =
-  | Const
-  | Restrict
-  | Volatile 
+  | Const_qual
+  | Restrict_qual
+  | Volatile_qual
+
+type func_spec =
+  | Inline_spec
+  | Noreturn_spec
+
+type symbol_desc =
+  | Nil_sym
+  | Decl_sym
+  | Type_sym
 
 type symbol = 
   {
     name: string;
-    decln: node;
-    defn: node;
-    stype: ctype; 
-    storage: store_spec;
+    mutable sdesc: symbol_desc;
+    mutable decln: node;
+    mutable defn: node;
+    mutable stype: ctype; 
+    mutable storage: store_spec;
   }
 
 and node = 
@@ -89,26 +100,27 @@ and node =
 
 and ctype_desc = 
   (* Compiler Tags *)
-  | TNil
+  | Nil_typ
   (* Builtin C Types *)
-  | TInt8
-  | TUInt8
-  | TInt16
-  | TUInt16
-  | TInt32
-  | TUInt32
-  | TInt64
-  | TUInt64
-  | TFloat32
-  | TFloat64
+  | Unit_typ
+  | Int8_typ
+  | UInt8_typ
+  | Int16_typ
+  | UInt16_typ
+  | Int32_typ
+  | UInt32_typ
+  | Int64_typ
+  | UInt64_typ
+  | Float32_typ
+  | Float64_typ
   (* Extended C Types *)
-  | TRune
+  | Rune_typ
   (* Complex Types *)
-  | TArray of ctype 
-  | TPointer of ctype
-  | TStruct
-  | TUnion
-  | TFunction
+  | Array_typ of ctype 
+  | Pointer_typ of ctype
+  | Struct_typ
+  | Union_typ
+  | Function_typ
 
 and ctype =
   {
@@ -123,13 +135,43 @@ and value =
   | Charval of string
   | Runeval of Rune.t 
 
-let ctype_nil = {typ=TNil; quals=[];}
+let ctype_nil = {typ=Nil_typ; quals=[];}
 
 let scopes : ( [`Mark | `Symbol of symbol] list) ref = ref []
 let symtab : (string, symbol) Hashtbl.t = Hashtbl.create 8 
 
+let new_name name =
+  let sym = {
+    name=name; 
+    sdesc=Nil_sym; 
+    decln=Nil; 
+    defn=Nil; 
+    storage=Auto_sto; 
+    stype=ctype_nil;
+  } in
+  Hashtbl.add symtab name sym ; sym 
+
 let lookup_symbol name = 
-  try Hashtbl.find symtab name 
-  with Not_found -> 
-    let sym = {name= name; decln= Nil; defn=Nil; storage=Auto; stype=ctype_nil;} in
-    Hashtbl.add symtab name sym ; sym 
+  try let sym = Hashtbl.find symtab name in Some sym
+  with Not_found -> None 
+
+(* Setup symbol table for builtin types *)
+let builtin_types = [
+  ("void", Unit_typ);
+  ("char", Int8_typ);
+  ("short", Int16_typ);
+  ("int", Int32_typ);
+  ("long", Int32_typ);
+  ("float", Float32_typ);
+  ("double", Float64_typ);
+  ("rune", Int32_typ);
+]
+
+let () =
+  List.iter (fun (s,t) -> 
+    let sym = new_name s in 
+    sym.stype <- {typ=t; quals=[];}; sym.sdesc <- Type_sym) builtin_types
+
+
+
+

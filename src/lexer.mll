@@ -30,31 +30,27 @@ let keyword_table =
     "auto", AUTO;
     "break", BREAK;
     "case", CASE;
-    "char", CHAR;
     "const", CONST;
     "default", DEFAULT;
     "do", DO;
-    "double", DOUBLE;
     "else", ELSE;
     "enum", ENUM;
     "extern", EXTERN;
-    "float", FLOAT;
     "for", FOR;
     "goto", GOTO;
     "if", IF;
-    "int", INT;
-    "long", LONG;
+    "inline", INLINE;
     "register", REGISTER;
+    "restrict", RESTRICT;
     "return", RETURN;
-    "short", SHORT;
     "signed", SIGNED;
     "sizeof", SIZEOF;
-    "static", STRUCT;
+    "static", STATIC;
+    "struct", STRUCT;
     "switch", SWITCH;
     "typedef", TYPEDEF;
     "union", UNION;
     "unsigned", UNSIGNED;
-    "void", VOID;
     "volatile", VOLATILE;
     "while", WHILE;
 ]
@@ -128,12 +124,12 @@ let reset_intlex () =
  * an int value and give it the default 'int' type *)
 let convert_int tag (sign, typ) value = 
   match tag with
-  | Decimal -> Intval (int_of_string value, {typ=TInt32; quals=[Const]})
-  | Hexidecimal -> Intval (int_of_string ("0x" ^ value), {typ=TInt32; quals=[Const]})
-  | Octal -> Intval (int_of_string ("0o" ^ value), {typ=TInt32; quals=[Const]}) 
+  | Decimal -> Intval (int_of_string value, {typ=Int32_typ; quals=[Const_qual]})
+  | Hexidecimal -> Intval (int_of_string ("0x" ^ value), {typ=Int32_typ; quals=[Const_qual]})
+  | Octal -> Intval (int_of_string ("0o" ^ value), {typ=Int32_typ; quals=[Const_qual]}) 
 
 let convert_dec_float value =
-  Floatval (float_of_string value, {typ=TFloat32; quals=[Const]})
+  Floatval (float_of_string value, {typ=Float32_typ; quals=[Const_qual]})
 
 let convert_hex_float signf expn =
   let rec convert_hex_float' signf len i acc =
@@ -147,10 +143,10 @@ let convert_hex_float signf expn =
   let v = float_of_int (int_of_string ("0x" ^ l)) in
   let v' = convert_hex_float' r (String.length r) 0 v in
   if expn == "" then
-    Floatval (v', {typ=TFloat32; quals=[Const]})
+    Floatval (v', {typ=Float32_typ; quals=[Const_qual]})
   else
     let v'' = v' *. (2. ** float_of_int (int_of_string (Misc.chop expn))) in
-    Floatval (v'', {typ=TFloat32; quals=[Const];}) 
+    Floatval (v'', {typ=Float32_typ; quals=[Const_qual];}) 
 
 let is_rune c =
   let byte = int_of_char c in
@@ -183,6 +179,7 @@ let dump_token t =
   | (Parser.RUNELIT (Ast.Runeval s)) -> Printf.printf "RUNELIT:%s\n" (Rune.to_string s)
   | (Parser.CHARLIT (Ast.Charval s)) -> Printf.printf "CHARLIT:%s\n" s
   | (Parser.IDENT s) -> Printf.printf "IDENT:%s\n" s
+  | (Parser.STRUCT) -> Printf.printf "STRUCT\n"
   | Parser.LBRACK -> Printf.printf "LBRACK\n"
   | Parser.RBRACK -> Printf.printf "RBRACK\n"
   | Parser.LPAREN -> Printf.printf "LPAREN\n"
@@ -235,9 +232,8 @@ let dump_token t =
 }
 
 let blank = [' ' '\t' '\n']
-let lowercase = ['a'-'z' '_']
-let uppercase = ['A'-'Z']
-let identchar = ['A'-'Z' 'a'-'z' '_' '0'-'9']
+let ident_start = ['A'-'Z' 'a'-'z' '_']
+let ident_char = ['A'-'Z' 'a'-'z' '_' '0'-'9']
 
 let hex_preffix = "0" ['x' 'X']
 
@@ -278,6 +274,20 @@ rule ltoken = parse
   | "#" [^'\n'] * "\n"
     { ltoken lexbuf }
 
+  | ident_start ident_char *
+    { let s = Lexing.lexeme lexbuf in
+      try 
+        Hashtbl.find keyword_table s
+      with Not_found ->
+        let sym_opt = Ast.lookup_symbol s in
+        match sym_opt with
+        | Some sym -> begin
+          match sym.sdesc with
+          | Type_sym  -> TYPE s
+          | _         -> IDENT s
+          end
+        | None -> IDENT s }
+
   | "0" ((octal_digit *) as v) int_suffix?
     { reset_intlex() ;
       INTLIT (convert_int Octal (!int_sign, !int_type) v) }
@@ -295,12 +305,7 @@ rule ltoken = parse
 
   | hex_preffix ((hex_frac_const as s) (bin_expon_part as e) | ((hex_digit+) as s) (bin_expon_part as e) ) float_suff?
     { FLOATLIT (convert_hex_float s e ) } 
-
-  | lowercase identchar *
-    { let s = Lexing.lexeme lexbuf in
-      try Hashtbl.find keyword_table s
-      with Not_found -> IDENT s } 
-
+  
   | "'\\u" (hex_quad as rune) "'"
     { RUNELIT (Ast.Runeval (Rune.from_rune (int_of_string ("0x" ^ rune)))) } 
 

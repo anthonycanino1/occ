@@ -2,6 +2,8 @@
    Use of this source is governed by a BSD-style license
    located in the LICENSE file. *)
 
+exception Found_eof
+
 let odbg = ref false
 
 let spec = [
@@ -14,9 +16,11 @@ let compile file =
   Location.curr_file := file ;
   let ic = Preproc.preproc_file file in
   let lexbuf = Lexing.from_channel ic in
-  Parser.implementation Lexer.ltoken lexbuf ;
+  let _ = Parser.implementation Lexer.ltoken lexbuf in
   if Compile.Errors.length Compile.errors > 0 then 
     (Compile.Errors.dump Compile.errors)
+  else
+    Printf.printf "No errors!\n"
 
 (*
 let compile file = 
