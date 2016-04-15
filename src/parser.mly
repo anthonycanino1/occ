@@ -1,10 +1,24 @@
 /* The parser definition */
 %{
 
-let parse_error s =
-  Printf.printf "%s\n" s ;
-  flush stdout
+open Compile
 
+(* Stateful parsing for declaration_specifiers: Semantic information
+ * has too little order to pass up from semantics actions. We would
+ * need a 5 tuple. *)
+let curr_storage_spec = ref Ast.Nil_sto
+let curr_type_quals : (Ast.type_qual list ref) = ref [] 
+let curr_type_specs : (Ast.node list ref) = ref []
+let curr_func_specs : (Ast.func_spec list ref) = ref []
+
+let curr_decl_valid = ref true
+
+let reset_decl_state () =
+  curr_storage_spec := Ast.Nil_sto ;
+  curr_type_quals := [] ;
+  curr_type_specs := [] ;
+  curr_func_specs := [] ;
+  curr_decl_valid := true
 %}
 
 /* Keywords */
@@ -49,7 +63,7 @@ external_decls
   ;
 
 external_decl
-  : decl SEMI { $1 }
+  : decl SEMI { reset_decl_state () ; $1 }
   ;
 
 decl
@@ -57,21 +71,26 @@ decl
   ;
 
 decl_specifiers
-  : storage_specifier       { ([$1],[],[],[],[]) }
-  | type_specifier          { ([],[$1],[],[],[]) }
-  | type_qualifier          { ([],[],[$1],[],[]) }
-  | func_specifier          { ([],[],[],[$1],[]) }
-  /*| alignment_specifier     { ([],[],[],[],[$1]) }*/
+  : storage_specifier       
+    { curr_storage_spec := $1 }
+  | type_specifier          
+    { curr_type_specs := $1 :: !curr_type_specs }
+  | type_qualifier          
+    { curr_type_quals := $1 :: !curr_type_quals }
+  | func_specifier          
+    { curr_func_specs := $1 :: !curr_func_specs }
   | decl_specifiers storage_specifier
-    { let (a,b,c,d,e) = $1 in ($2::a,b,c,d,e) }
+    { match !curr_storage_spec with
+      | Ast.Nil_sto -> curr_storage_spec := $2 
+      | _ -> 
+        Errors.errorf errors (Location.curr_yacc $startpos) "multiple storage classes in declaration specifiers" ; 
+        curr_decl_valid := false } 
   | decl_specifiers type_specifier
-    { let (a,b,c,d,e) = $1 in (a,$2::b,c,d,e) }
+    { curr_type_specs := $2 :: !curr_type_specs }
   | decl_specifiers type_qualifier
-    { let (a,b,c,d,e) = $1 in (a,b,$2::c,d,e) }
+    { curr_type_quals := $2 :: !curr_type_quals }
   | decl_specifiers func_specifier
-    { let (a,b,c,d,e) = $1 in (a,b,c,$2::d,e) }
-  /*| decl_specifiers alignment_specifier
-    { let (a,b,c,d,e) = $1 in (a,b,c,d,$2::e) }*/
+    { curr_func_specs := $2 :: !curr_func_specs }
   ;
   
 storage_specifier
@@ -107,13 +126,34 @@ func_specifier
   ;
 
 struct_spec
-  : STRUCT name { Ast.Nil }
-  | STRUCT name_opt LBRACE struct_decls_opt RBRACE {Ast.Nil}
+  : STRUCT symstr=name 
+    { 
+      let sym = Decl.new_struct_name symstr in
+      Ast.Name sym
+    }
+    
+  | nme=struct_spec_head LBRACE fds=struct_decls_opt RBRACE
+    {
+      Ast.Struct (nme,fds)
+    }
   ;
 
+struct_spec_head
+  : STRUCT name_opt 
+    { 
+      match $2 with
+      | Some s ->
+        let sym = Decl.new_struct_name s in
+        let open Ast in
+        sym.stype <- {typ=Incomplete_typ; quals=[]; } ;
+        Some (Ast.Name sym)
+      | None -> None 
+    } 
+  ; 
+
 struct_decls_opt
-  : /* empty */   { None }
-  | struct_decls  { Some $1 }
+  : /* empty */   { [] }
+  | struct_decls  { $1 }
   ; 
 
 struct_decls
@@ -178,7 +218,7 @@ pointer_opt
   ; 
 
 pointer
-  : STAR type_qualifiers            { Ast.Nil }
+  : STAR type_qualifiers          { Ast.Nil }
   | STAR type_qualifiers pointer  { Ast.Nil }
   ;
 
@@ -186,11 +226,11 @@ direct_declarator
   : name { $1 }
   ;
 
-name: 
-  IDENT { Ast.Nil } 
+name
+  : IDENT { $1 } 
   ;
 
 name_opt
-  : /* empty */ { Ast.Nil } 
-  | name        { $1 }
+  : /* empty */ { None } 
+  | name        { Some $1 }
   ; 

@@ -279,7 +279,7 @@ rule ltoken = parse
       try 
         Hashtbl.find keyword_table s
       with Not_found ->
-        let sym_opt = Ast.lookup_symbol s in
+        let sym_opt = Decl.lookup_decl_sym s in
         match sym_opt with
         | Some sym -> begin
           match sym.sdesc with

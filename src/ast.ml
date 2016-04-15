@@ -38,6 +38,7 @@ type store_spec =
   | Register_sto
   | Static_sto 
   | Typedef_sto
+  | Nil_sto
 
 type type_qual =
   | Const_qual
@@ -93,14 +94,12 @@ and node =
   | Default of node * node list
   (* Declarations *)
   | Typedef of node * node
-  | Struct of node * node list
+  | Struct of node option * node list
   | Union of node * node list
   | Enum of node * node list
   | Function of node * node * node list * node list
 
 and ctype_desc = 
-  (* Compiler Tags *)
-  | Nil_typ
   (* Builtin C Types *)
   | Unit_typ
   | Int8_typ
@@ -121,6 +120,7 @@ and ctype_desc =
   | Struct_typ
   | Union_typ
   | Function_typ
+  | Incomplete_typ
 
 and ctype =
   {
@@ -134,44 +134,3 @@ and value =
   | Floatval of float * ctype
   | Charval of string
   | Runeval of Rune.t 
-
-let ctype_nil = {typ=Nil_typ; quals=[];}
-
-let scopes : ( [`Mark | `Symbol of symbol] list) ref = ref []
-let symtab : (string, symbol) Hashtbl.t = Hashtbl.create 8 
-
-let new_name name =
-  let sym = {
-    name=name; 
-    sdesc=Nil_sym; 
-    decln=Nil; 
-    defn=Nil; 
-    storage=Auto_sto; 
-    stype=ctype_nil;
-  } in
-  Hashtbl.add symtab name sym ; sym 
-
-let lookup_symbol name = 
-  try let sym = Hashtbl.find symtab name in Some sym
-  with Not_found -> None 
-
-(* Setup symbol table for builtin types *)
-let builtin_types = [
-  ("void", Unit_typ);
-  ("char", Int8_typ);
-  ("short", Int16_typ);
-  ("int", Int32_typ);
-  ("long", Int32_typ);
-  ("float", Float32_typ);
-  ("double", Float64_typ);
-  ("rune", Int32_typ);
-]
-
-let () =
-  List.iter (fun (s,t) -> 
-    let sym = new_name s in 
-    sym.stype <- {typ=t; quals=[];}; sym.sdesc <- Type_sym) builtin_types
-
-
-
-
