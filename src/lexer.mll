@@ -171,6 +171,7 @@ let simple_esc_code c =
 
 let simple_esc_char c = String.make 1 (simple_esc_code c)
   
+(*
 let dump_token t =
   match t with
   | (Parser.INTLIT (Ast.Intval (i,t))) -> Printf.printf "INTLIT:%d\n" i
@@ -228,7 +229,7 @@ let dump_token t =
   | Parser.XOREQ-> Printf.printf "XOREQ\n" 
   | Parser.EOF -> Printf.printf "EOF\n" 
   | _ -> Printf.printf "Unknown\n" 
-
+*)
 }
 
 let blank = [' ' '\t' '\n']
@@ -274,19 +275,24 @@ rule ltoken = parse
   | "#" [^'\n'] * "\n"
     { ltoken lexbuf }
 
+  | "struct" blank + (ident_start ident_char* as ident) 
+    {
+      let sident = "struct::" ^ ident in
+      let ssym = Decl.lookup_sym sident in
+      SIDENT ssym 
+    }
+
   | ident_start ident_char *
-    { let s = Lexing.lexeme lexbuf in
+    { 
+      let s = Lexing.lexeme lexbuf in
       try 
         Hashtbl.find keyword_table s
       with Not_found ->
-        let sym_opt = Decl.lookup_decl_sym s in
-        match sym_opt with
-        | Some sym -> begin
-          match sym.sdesc with
-          | Type_sym  -> TYPE s
-          | _         -> IDENT s
-          end
-        | None -> IDENT s }
+        let sym = Decl.lookup_sym s in
+        match sym.sdesc with
+        | Type_sym  -> TYPE sym
+        | _         -> IDENT sym
+    }
 
   | "0" ((octal_digit *) as v) int_suffix?
     { reset_intlex() ;

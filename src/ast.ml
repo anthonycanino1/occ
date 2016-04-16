@@ -62,6 +62,7 @@ type symbol =
     mutable defn: node;
     mutable stype: ctype; 
     mutable storage: store_spec;
+    mutable block: int;
   }
 
 and node = 
@@ -93,11 +94,12 @@ and node =
   | Case of node * node list
   | Default of node * node list
   (* Declarations *)
-  | Typedef of node * node
-  | Struct of node option * node list
-  | Union of node * node list
-  | Enum of node * node list
-  | Function of node * node * node list * node list
+  | Variable of symbol * node
+  | Typedef of symbol * node
+  | Struct of symbol option * node list
+  | Union of symbol option * node list
+  | Enum of symbol option * node list
+  | Function of symbol * node * node list * node list
 
 and ctype_desc = 
   (* Builtin C Types *)

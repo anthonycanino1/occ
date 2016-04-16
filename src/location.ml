@@ -14,5 +14,8 @@ let curr lexbuf =
 let curr_yacc pos =
   (!curr_file, pos.pos_lnum, pos.pos_cnum, false)
 
+(* For use while developing *)
+let dummy = (!curr_file, 0, 0, true)
+
 let to_error_string (file,line,col,_) = 
   Printf.sprintf "%s:%d:%d" file line col

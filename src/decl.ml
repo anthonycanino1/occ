@@ -2,51 +2,98 @@
    Use of this source is governed by a BSD-style license
    located in the LICENSE file. *) 
 
-let ctype_nil = let open Ast in {typ=Incomplete_typ; quals=[];}
+open Ast
 
-let scopes : ( [`Mark | `Symbol of Ast.symbol] list) ref = ref []
+let ctype_nil = let open Ast in {typ=Incomplete_typ; quals=[];} 
 
-let decl_symtab : (string, Ast.symbol) Hashtbl.t = Hashtbl.create 8 
-let struct_symtab : (string, Ast.symbol) Hashtbl.t = Hashtbl.create 8 
+let symtab : (string, Ast.symbol) Hashtbl.t = Hashtbl.create 8 
 
-let new_name name table =
-  let open Ast in
-  let sym : symbol = {
-    name=name; 
-    sdesc=Nil_sym; 
-    decln=Nil; 
-    defn=Nil; 
-    storage=Auto_sto; 
-    stype=ctype_nil;
-  } in
-  Hashtbl.add table name sym ; sym 
+let scopes : ( [`Mark | `Symbol of ('a * 'b * 'c * 'd * 'e * 'f * 'g)] list) ref = ref []
+let curr_block = ref 0 
 
-let new_decl_name name = new_name name decl_symtab
-let new_struct_name name = new_name name struct_symtab
+let lookup_sym name =
+  try 
+    (Hashtbl.find symtab name)
+  with Not_found -> 
+    let sym : symbol = {
+      name=name; 
+      sdesc=Nil_sym; 
+      decln=Nil; 
+      defn=Nil; 
+      storage=Auto_sto; 
+      stype=ctype_nil;
+      block= !curr_block;
+    } in
+    Hashtbl.add symtab name sym ; 
+    sym 
 
-let lookup_sym name table = 
-  try Some (Hashtbl.find table name)
-  with Not_found -> None 
+(* TODO: Super simple name node creation right now,
+ * but will get complex. declaring functions *)
+let new_name sym = Name sym
+let old_name sym = sym.decln
 
-let lookup_struct_sym name = lookup_sym name decl_symtab
-let lookup_decl_sym name = lookup_sym name struct_symtab
+let push_decl sym =
+  let dcl = (sym.name, sym.sdesc, sym.decln, sym.defn, sym.stype, sym.storage, sym.block) in
+  scopes := (`Symbol dcl :: !scopes)
 
+let mark_scope =
+  scopes := (`Mark :: !scopes)
+
+let pop_decls () =
+  let rec pop_decls' scps =
+    match scps with
+    | (`Symbol (name,sdesc,decln,defn,stype,storage,block)) :: scps ->
+      let sym = lookup_sym name in
+      sym.sdesc <- sdesc ;
+      sym.decln <- decln ;
+      sym.defn  <- defn ;
+      sym.stype <- stype ;
+      sym.storage <- storage ;
+      sym.block <- block ;
+      pop_decls' scps 
+    | (`Mark :: scps) ->
+      scopes := scps
+    | [] -> ()
+  in pop_decls' !scopes
+
+let declare nd =
+  let declare' sym =
+    match sym.decln with 
+    | Nil ->
+      sym.decln <- nd ; 
+      sym.block <- !curr_block ;
+    | _ ->
+      if !curr_block == sym.block then
+        Compile.Errors.errorf Compile.errors Location.dummy "redeclaration of symbol %s" sym.name
+      else
+        push_decl sym ;
+        sym.decln <- nd ;
+        sym.block <- !curr_block 
+  in
+  match nd with
+  | Variable (sym, _) -> declare' sym
+  | Typedef (sym, _) -> declare' sym
+  | Struct ((Some sym), _) -> declare' sym
+  | Union ((Some sym), _) -> declare' sym
+  | Enum ((Some sym), _) -> declare' sym
+  | Function (sym, _, _, _) -> declare' sym
+  | _ -> raise (Misc.Internal_error "declaring a non decl node")
+  
 (* Setup symbol table for builtin types *)
 let builtin_types = [
-  ("void", Ast.Unit_typ);
-  ("char", Ast.Int8_typ);
-  ("short", Ast.Int16_typ);
-  ("int", Ast.Int32_typ);
-  ("long", Ast.Int32_typ);
-  ("float", Ast.Float32_typ);
-  ("double", Ast.Float64_typ);
-  ("rune", Ast.Int32_typ);
+  ("void", Unit_typ);
+  ("char", Int8_typ);
+  ("short", Int16_typ);
+  ("int", Int32_typ);
+  ("long", Int32_typ);
+  ("float", Float32_typ);
+  ("double", Float64_typ);
+  ("rune", Int32_typ);
 ]
 
 let () =
   List.iter (fun (s,t) -> 
-    let sym = new_decl_name s in 
-    let open Ast in 
+    let sym = lookup_sym s in 
     sym.stype <- {typ=t; quals=[];}; sym.sdesc <- Type_sym) builtin_types
 
 

@@ -46,8 +46,9 @@ let reset_decl_state () =
 %token <Ast.value> INTLIT
 %token <Ast.value> FLOATLIT
 
-%token <string> IDENT 
-%token <string> TYPE
+%token <Ast.symbol> IDENT 
+%token <Ast.symbol> TYPE
+%token <Ast.symbol> SIDENT
 
 %start implementation
 %type <Ast.node list> implementation
@@ -126,9 +127,8 @@ func_specifier
   ;
 
 struct_spec
-  : STRUCT symstr=name 
+  : sym=SIDENT
     { 
-      let sym = Decl.new_struct_name symstr in
       Ast.Name sym
     }
     
@@ -139,15 +139,13 @@ struct_spec
   ;
 
 struct_spec_head
-  : STRUCT name_opt 
+  : STRUCT 
+    { None }
+  | sym = SIDENT
     { 
-      match $2 with
-      | Some s ->
-        let sym = Decl.new_struct_name s in
-        let open Ast in
-        sym.stype <- {typ=Incomplete_typ; quals=[]; } ;
-        Some (Ast.Name sym)
-      | None -> None 
+      let open Ast in
+      sym.stype <- {typ=Incomplete_typ; quals=[]; } ;
+      Some sym
     } 
   ; 
 
