@@ -136,3 +136,31 @@ and value =
   | Floatval of float * ctype
   | Charval of string
   | Runeval of Rune.t 
+
+let rec ctype_equals t1 t2 =
+  let rec ctype_desc_equals t1 t2 =
+    match t1,t2 with
+    | Unit_typ, Unit_typ
+    | Int8_typ, Int8_typ
+    | UInt8_typ, UInt8_typ
+    | Int16_typ, Int16_typ
+    | UInt16_typ, UInt16_typ
+    | Int32_typ, Int32_typ
+    | UInt32_typ, UInt32_typ
+    | Int64_typ, Int64_typ
+    | UInt64_typ, UInt64_typ
+    | Float32_typ, Float32_typ
+    | Float64_typ, Float64_typ
+    | Rune_typ, Rune_typ ->
+      true
+    | Array_typ t1, Array_typ t2 ->
+      ctype_equals t1 t2
+    | Pointer_typ t1, Pointer_typ t2 ->
+      ctype_equals t1 t2
+    | Struct_typ, Struct_typ
+    | Union_typ, Union_typ
+    | Function_typ, Function_typ
+    | Incomplete_typ, Incomplete_typ ->
+      true
+    | _ -> false
+  in ctype_desc_equals t1.typ t2.typ

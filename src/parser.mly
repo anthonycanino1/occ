@@ -129,12 +129,23 @@ func_specifier
 struct_spec
   : sym=SIDENT
     { 
-      Ast.Name sym
+      let open Ast in
+      sym.stype <- {typ=Incomplete_typ; quals=[]; } ;
+      let name = Ast.Name sym in
+      Decl.declare name ;
+      name
     }
     
-  | nme=struct_spec_head LBRACE fds=struct_decls_opt RBRACE
+  | name=struct_spec_head LBRACE fds=struct_decls_opt RBRACE
     {
-      Ast.Struct (nme,fds)
+      match name with
+      | None -> 
+        Ast.Struct (None,fds)
+      | Some (Ast.Name sym) -> 
+        let nde = Ast.Struct ((Some sym),fds) in
+        Decl.define nde ;
+        nde
+      | _ -> raise (Misc.Internal_error "unexpected non-name node in struct")
     }
   ;
 
@@ -145,7 +156,9 @@ struct_spec_head
     { 
       let open Ast in
       sym.stype <- {typ=Incomplete_typ; quals=[]; } ;
-      Some sym
+      let name = Ast.Name sym in
+      Decl.declare name ;
+      Some name 
     } 
   ; 
 
@@ -228,7 +241,9 @@ name
   : IDENT { $1 } 
   ;
 
+(*
 name_opt
   : /* empty */ { None } 
   | name        { Some $1 }
   ; 
+  *)

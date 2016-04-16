@@ -37,9 +37,13 @@ let push_decl sym =
   scopes := (`Symbol dcl :: !scopes)
 
 let mark_scope =
+  curr_block := !curr_block ;
   scopes := (`Mark :: !scopes)
 
 let pop_decls () =
+  if !curr_block == 0 then 
+    raise (Misc.Internal_error "trying to pop global scope")
+  else
   let rec pop_decls' scps =
     match scps with
     | (`Symbol (name,sdesc,decln,defn,stype,storage,block)) :: scps ->
@@ -54,23 +58,27 @@ let pop_decls () =
     | (`Mark :: scps) ->
       scopes := scps
     | [] -> ()
-  in pop_decls' !scopes
+  in pop_decls' !scopes ;
+  curr_block := !curr_block - 1
 
 let declare nd =
   let declare' sym =
     match sym.decln with 
     | Nil ->
+      Printf.printf "declared %s\n" sym.name ;
       sym.decln <- nd ; 
       sym.block <- !curr_block ;
     | _ ->
       if !curr_block == sym.block then
         Compile.Errors.errorf Compile.errors Location.dummy "redeclaration of symbol %s" sym.name
       else
+        Printf.printf "declared %s\n" sym.name ;
         push_decl sym ;
         sym.decln <- nd ;
         sym.block <- !curr_block 
   in
   match nd with
+  | Name sym -> declare' sym 
   | Variable (sym, _) -> declare' sym
   | Typedef (sym, _) -> declare' sym
   | Struct ((Some sym), _) -> declare' sym
@@ -78,6 +86,18 @@ let declare nd =
   | Enum ((Some sym), _) -> declare' sym
   | Function (sym, _, _, _) -> declare' sym
   | _ -> raise (Misc.Internal_error "declaring a non decl node")
+
+let define nd =
+  let define' sym =
+    match sym.defn with
+    | Nil -> 
+      Printf.printf "defined %s\n" sym.name ;
+      sym.defn <- nd
+    | _ -> Compile.Errors.errorf Compile.errors Location.dummy "redefinition of symbol %s" sym.name
+  in
+  match nd with
+  | Struct ((Some sym), _) -> define' sym
+  | _ -> raise (Misc.Internal_error "defining a non decl node") 
   
 (* Setup symbol table for builtin types *)
 let builtin_types = [
