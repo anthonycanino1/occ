@@ -8,7 +8,7 @@ open Compile
  * need a 5 tuple. *)
 let curr_storage_spec = ref Ast.Nil_sto
 let curr_type_quals : (Ast.type_qual list ref) = ref [] 
-let curr_type_specs : (Ast.node list ref) = ref []
+let lasttype = ref Decl.ctype_nil
 let curr_func_specs : (Ast.func_spec list ref) = ref []
 
 let curr_decl_valid = ref true
@@ -16,9 +16,10 @@ let curr_decl_valid = ref true
 let reset_decl_state () =
   curr_storage_spec := Ast.Nil_sto ;
   curr_type_quals := [] ;
-  curr_type_specs := [] ;
+  lasttype := Decl.ctype_nil ;
   curr_func_specs := [] ;
-  curr_decl_valid := true
+  curr_decl_valid := true 
+
 %}
 
 /* Keywords */
@@ -46,37 +47,33 @@ let reset_decl_state () =
 %token <Ast.value> INTLIT
 %token <Ast.value> FLOATLIT
 
-%token <Ast.symbol> IDENT 
-%token <Ast.symbol> TYPE
-%token <Ast.symbol> SIDENT
+%token <string> IDENT 
+%token <string> TYPE
 
 %start implementation
-%type <Ast.node list> implementation
+%type <unit> implementation
 
 %%
 implementation
-  : external_decls EOF { $1 }
+  : xdecls EOF { () }
   ; 
 
-external_decls
-  : external_decl { [$1] }
-  | external_decls external_decl { $2 :: $1 }
+xdecls
+  : xdecl { () }
+  | xdecls xdecl { () }
   ;
 
-external_decl
-  : decl SEMI { reset_decl_state () ; $1 }
-  ;
-
-decl
-  : decl_specifiers init_declarators_opt { Ast.Nil }
+xdecl
+  : decl_specifiers SEMI { reset_decl_state () }
+  | decl_specifiers xdecllist SEMI { reset_decl_state () }
   ;
 
 decl_specifiers
   : storage_specifier       
     { curr_storage_spec := $1 }
-  | type_specifier          
-    { curr_type_specs := $1 :: !curr_type_specs }
-  | type_qualifier          
+  | types          
+    { lasttype := $1 ; () }
+  | tqual          
     { curr_type_quals := $1 :: !curr_type_quals }
   | func_specifier          
     { curr_func_specs := $1 :: !curr_func_specs }
@@ -84,11 +81,12 @@ decl_specifiers
     { match !curr_storage_spec with
       | Ast.Nil_sto -> curr_storage_spec := $2 
       | _ -> 
-        Errors.errorf errors (Location.curr_yacc $startpos) "multiple storage classes in declaration specifiers" ; 
+        Errors.errorf errors (Location.curr_yacc $startpos) 
+          "multiple storage classes in declaration specifiers" ; 
         curr_decl_valid := false } 
-  | decl_specifiers type_specifier
-    { curr_type_specs := $2 :: !curr_type_specs }
-  | decl_specifiers type_qualifier
+  | decl_specifiers types
+    { lasttype := $2 ; () }
+  | decl_specifiers tqual
     { curr_type_quals := $2 :: !curr_type_quals }
   | decl_specifiers func_specifier
     { curr_func_specs := $2 :: !curr_func_specs }
@@ -102,63 +100,66 @@ storage_specifier
   | TYPEDEF   { Ast.Typedef_sto }
   ;
 
-type_specifier
-  : struct_spec   { $1 }
-  | type_node     { $1 }
+types
+  : complex     { $1 }
+  | tname       { $1 }
   ;
 
-type_node
-  : TYPE          { Ast.Nil }
+tname
+  : TYPE          
+    { 
+      let open Ast in
+      let symopt = Decl.lookup_sym $1 in
+      match symopt with
+      | Some sym  -> sym.stype
+      | _         ->
+        raise (Misc.Internal_error (Format.sprintf "expected to find symbol for %s" $1))
+    }
   ;
 
-type_qualifier
+tqual
   : CONST     { Ast.Const_qual } 
   | RESTRICT  { Ast.Restrict_qual }
   | VOLATILE  { Ast.Volatile_qual }
   ;
 
-type_qualifiers
+tquals
   : /* empty */   { [] }
-  | type_qualifiers type_qualifier { $2 :: $1 }
+  | tquals tqual { $2 :: $1 }
   ;
 
 func_specifier
   : INLINE { Ast.Inline_spec }
   ;
 
-struct_spec
-  : sym=SIDENT
+complex
+  : STRUCT IDENT
     { 
       let open Ast in
-      sym.stype <- {typ=Incomplete_typ; quals=[]; } ;
-      let name = Ast.Name sym in
-      Decl.declare name ;
-      name
+      let structid = "struct::" ^ $2 in
+      let sym = Decl.declare_incomplete structid in
+      sym.stype
     }
     
-  | name=struct_spec_head LBRACE fds=struct_decls_opt RBRACE
+  | struct_head LBRACE struct_decls_opt RBRACE
     {
-      match name with
-      | None -> 
-        Ast.Struct (None,fds)
-      | Some (Ast.Name sym) -> 
-        let nde = Ast.Struct ((Some sym),fds) in
-        Decl.define nde ;
-        nde
-      | _ -> raise (Misc.Internal_error "unexpected non-name node in struct")
+      let open Ast in
+      let nd = Struct ($1.name,$3) in
+      Decl.define_incomplete $1 nd ;
+      $1.stype
     }
   ;
 
-struct_spec_head
+struct_head
   : STRUCT 
-    { None }
-  | sym = SIDENT
     { 
-      let open Ast in
-      sym.stype <- {typ=Incomplete_typ; quals=[]; } ;
-      let name = Ast.Name sym in
-      Decl.declare name ;
-      Some name 
+      let structid = Decl.gen_anon_struct () in
+      Decl.declare_incomplete structid 
+    }
+  | STRUCT IDENT
+    { 
+      let structid = "struct::" ^ $2 in
+      Decl.declare_incomplete structid 
     } 
   ; 
 
@@ -177,11 +178,11 @@ struct_decl
   ;
 
 specifier_qualifiers
-  : type_specifier { ([$1],[]) }
-  | type_qualifier { ([],[$1]) }
-  | specifier_qualifiers type_specifier
+  : types { ([$1],[]) }
+  | tqual { ([],[$1]) }
+  | specifier_qualifiers types
     { let (a,b) = $1 in ($2 :: a, b) }
-  | specifier_qualifiers type_qualifier
+  | specifier_qualifiers tqual
     { let (a,b) = $1 in (a, $2 :: b) }
   ; 
 
@@ -196,54 +197,37 @@ struct_declarators
   ;
 
 struct_declarator
-  : init_declarator { $1 }
+  : xdeclor { $1 }
   ;
     
-init_declarators_opt
-  : /* empty */ { None }
-  | init_declarators { Some $1 }
+xdecllist
+  : xdeclor                 { Decl.declare $1 !lasttype ; () }
+  | xdecllist COMMA xdeclor { Decl.declare $3 !lasttype ; () }
+  ;
+
+xdeclor
+  : STAR tquals xdeclor  { Ast.Pointer_hp $3 }
+  | xdeclor2      { $1 }
   ; 
 
-init_declarators
-  : init_declarator { [$1] }
-  | init_declarators COMMA init_declarator { $3 :: $1 }
+xdeclor2
+  : IDENT                           { Ast.Name_hp $1 }
+  | LPAREN xdeclor RPAREN           { $2 }
+  | xdeclor2 LPAREN arglist RPAREN  { Ast.Func_hp ($1,$3) }
+  | xdeclor2 LBRACK expr RBRACK     { Ast.Array_hp $1 }
   ;
 
-init_declarator
-  : declarator          { Ast.Nil }
-  /*| declarator EQ init  { Ast.Nil }*/
+arglist
+  : TYPE { [] }
   ;
 
-declarator
-  : pointer_opt direct_declarator { Ast.Nil }
-  ;
+expr
+  : /* empty */ { Ast.Nil }
+  
 
-/*
-init
-  : EOF { Ast.Nil }
-  ;*/
 
-pointer_opt
-  : /* empty */ { None }
-  | pointer   { Some $1 }
-  ; 
 
-pointer
-  : STAR type_qualifiers          { Ast.Nil }
-  | STAR type_qualifiers pointer  { Ast.Nil }
-  ;
 
-direct_declarator
-  : name { $1 }
-  ;
 
-name
-  : IDENT { $1 } 
-  ;
 
-(*
-name_opt
-  : /* empty */ { None } 
-  | name        { Some $1 }
-  ; 
-  *)
+

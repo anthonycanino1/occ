@@ -50,19 +50,16 @@ type func_spec =
   | Noreturn_spec
 
 type symbol_desc =
-  | Nil_sym
   | Decl_sym
   | Type_sym
 
 type symbol = 
   {
     name: string;
-    mutable sdesc: symbol_desc;
-    mutable decln: node;
-    mutable defn: node;
+    sdesc: symbol_desc;
     mutable stype: ctype; 
-    mutable storage: store_spec;
-    mutable block: int;
+    storage: store_spec;
+    block: int;
   }
 
 and node = 
@@ -95,11 +92,11 @@ and node =
   | Default of node * node list
   (* Declarations *)
   | Variable of symbol * node
-  | Typedef of symbol * node
-  | Struct of symbol option * node list
-  | Union of symbol option * node list
-  | Enum of symbol option * node list
-  | Function of symbol * node * node list * node list
+  | Typedef of string * node
+  | Struct of string * node list
+  | Union of string option * node list
+  | Enum of string option * node list
+  | Function of string * node * node list * node list
 
 and ctype_desc = 
   (* Builtin C Types *)
@@ -128,7 +125,7 @@ and ctype =
   {
     typ: ctype_desc;
     quals: type_qual list;
-  }
+  } 
 
 and value =
   | Strval of string
@@ -137,30 +134,69 @@ and value =
   | Charval of string
   | Runeval of Rune.t 
 
-let rec ctype_equals t1 t2 =
-  let rec ctype_desc_equals t1 t2 =
-    match t1,t2 with
-    | Unit_typ, Unit_typ
-    | Int8_typ, Int8_typ
-    | UInt8_typ, UInt8_typ
-    | Int16_typ, Int16_typ
-    | UInt16_typ, UInt16_typ
-    | Int32_typ, Int32_typ
-    | UInt32_typ, UInt32_typ
-    | Int64_typ, Int64_typ
-    | UInt64_typ, UInt64_typ
-    | Float32_typ, Float32_typ
-    | Float64_typ, Float64_typ
-    | Rune_typ, Rune_typ ->
-      true
-    | Array_typ t1, Array_typ t2 ->
-      ctype_equals t1 t2
-    | Pointer_typ t1, Pointer_typ t2 ->
-      ctype_equals t1 t2
-    | Struct_typ, Struct_typ
-    | Union_typ, Union_typ
-    | Function_typ, Function_typ
-    | Incomplete_typ, Incomplete_typ ->
-      true
-    | _ -> false
-  in ctype_desc_equals t1.typ t2.typ
+(* Type exists soley to aid in the construction of types *)
+and type_cons =
+  | Name_hp of string
+  | Pointer_hp of type_cons
+  | Func_hp of type_cons * ctype list
+  | Array_hp of type_cons 
+
+let rec string_of_ctype {typ;quals}  = 
+  match typ with
+  | Unit_typ    -> "unit"
+  | Int8_typ    -> "int8"
+  | UInt8_typ   -> "uint8"
+  | Int16_typ   -> "int16"
+  | UInt16_typ  -> "uint16"
+  | Int32_typ   -> "int32"
+  | UInt32_typ  -> "uint32"
+  | Int64_typ   -> "int64"
+  | UInt64_typ  -> "uint64"
+  | Float32_typ -> "float32"
+  | Float64_typ -> "float64"
+  (* Extended C Types *)
+  | Rune_typ        -> "rune"
+  | Array_typ t     -> string_of_ctype t ^ "[]"
+  | Pointer_typ t   -> string_of_ctype t ^ "*"
+  | Struct_typ      -> "struct"
+  | Union_typ       -> "union"
+  | Function_typ    -> "function"
+  | Incomplete_typ  -> "incomplete"
+
+
+let string_of_node nd =
+  match nd with
+  | Nil -> "Nil"
+  (* Expressions *)
+  | Name _ -> "Name"
+  | Value _ -> "Value"
+  | Unary_op (_,_,_) -> "Unary_op"
+  | Binary_op (_,_,_,_) -> "Binary_op"
+  | Indir (_,_) -> "Indir"
+  | Address (_,_) -> "Address"
+  | Call (_,_,_) -> "Call"
+  | Cast (_,_) -> "Cast"
+  | Proj (_,_,_) -> "Proj"
+  | Index (_,_,_) -> "Index"
+  | Assign (_,_,_) -> "Assign"
+  | Comma (_,_,_) -> "Comma"
+  (* Statements *)
+  | Expr_stmt _ -> "Expr_stmt"
+  | If (_,_,_) -> "If"
+  | Switch (_,_) -> "Switch"
+  | While (_,_,_) -> "While"
+  | For (_,_) -> "For"
+  | Goto _ -> "Goto"
+  | Continue -> "Continue"
+  | Break -> "Break"
+  | Return _ -> "Return"
+  | Label _ -> "Label"
+  | Case (_,_) -> "Case"
+  | Default (_,_) -> "Default"
+  (* Declarations *)
+  | Variable (_,_) -> "Variable"
+  | Typedef (_,_) -> "Typedef"
+  | Struct (_,_) -> "Struct"
+  | Union (_,_) -> "Union"
+  | Enum (_,_) -> "Enum"
+  | Function (_,_,_,_) -> "Function" 

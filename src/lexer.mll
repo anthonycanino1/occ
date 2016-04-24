@@ -275,23 +275,19 @@ rule ltoken = parse
   | "#" [^'\n'] * "\n"
     { ltoken lexbuf }
 
-  | "struct" blank + (ident_start ident_char* as ident) 
-    {
-      let sident = "struct::" ^ ident in
-      let ssym = Decl.lookup_sym sident in
-      SIDENT ssym 
-    }
-
   | ident_start ident_char *
     { 
       let s = Lexing.lexeme lexbuf in
       try 
         Hashtbl.find keyword_table s
       with Not_found ->
-        let sym = Decl.lookup_sym s in
-        match sym.sdesc with
-        | Type_sym  -> TYPE sym
-        | _         -> IDENT sym
+        match (Decl.lookup_sym s) with
+        | Some sym -> begin
+          match sym.sdesc with
+          | Type_sym  -> TYPE s
+          | _         -> IDENT s
+          end
+        | None -> IDENT s 
     }
 
   | "0" ((octal_digit *) as v) int_suffix?

@@ -16,11 +16,8 @@ let compile file =
   Location.curr_file := file ;
   let ic = Preproc.preproc_file file in
   let lexbuf = Lexing.from_channel ic in
-  let _ = Parser.implementation Lexer.ltoken lexbuf in
-  if Compile.Errors.length Compile.errors > 0 then 
-    (Compile.Errors.dump Compile.errors)
-  else
-    Printf.printf "No errors!\n"
+  Parser.implementation Lexer.ltoken lexbuf ;
+  if Compile.Errors.length Compile.errors > 0 then (Compile.Errors.dump Compile.errors)
 
 (*
 let compile file = 
