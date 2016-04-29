@@ -5,7 +5,7 @@
 open Ast
 open Compile
 
-let ctype_nil = let open Ast in {typ=Incomplete_typ; quals=[];} 
+let ctype_nil = let open Ast in {typ=Incomplete_typ; qual=Noq;} 
 
 let symtab : (string, Ast.symbol) Hashtbl.t = Hashtbl.create 8 
 
@@ -49,15 +49,14 @@ let pop_decls () =
   in pop_decls' !scopes ;
   curr_block := !curr_block - 1 
 
-let declare_incomplete name =
-  let old_sym = lookup_sym name in
-  match old_sym with
+let tag name =
+  let osym = lookup_sym name in
+  match osym with
   | None ->
     let sym = {
       name=name;
-      sdesc=Decl_sym;
       stype=ctype_nil; 
-      storage=Nil_sto;
+      stoclass=Nil_sto;
       block= !curr_block;
     } in
     push_sym sym ; 
@@ -76,22 +75,21 @@ let define_incomplete sym nd =
     Errors.errorf errors Location.dummy "redefinition of symbol %s" sym.name
   else
     Printf.printf "defined %s\n" sym.name ; 
-    sym.stype <- {typ=Struct_typ; quals=[]}
+    sym.stype <- {typ=Incomplete_typ; qual=Noq}
 
-let rec declare dcl typ =
+let rec declare dcl typ cls =
   match dcl with
-  | Pointer_hp d  -> declare d {typ=Pointer_typ typ; quals=[]}
-  | Array_hp d    -> declare d {typ=Array_typ typ; quals=[]}
-  | Func_hp (d,_) -> declare d {typ=Function_typ; quals=[]}
+  | Pointer_hp d  -> declare d {typ=Pointer_typ typ; qual=Noq} cls
+  | Array_hp d    -> declare d {typ=Array_typ typ; qual=Noq} cls
+  | Func_hp (d,_) -> declare d {typ=Function_typ; qual=Noq} cls
   | Name_hp name  ->
-    let old_sym = lookup_sym name in
-    match old_sym with
+    let osym = lookup_sym name in
+    match osym with
     | None ->
       let sym = {
         name=name;
-        sdesc=Decl_sym;
         stype=typ; 
-        storage=Nil_sto;
+        stoclass=cls;
         block= !curr_block;
       } in
       push_sym sym ; 
@@ -126,9 +124,8 @@ let () =
   List.iter (fun (s,t) -> 
     let sym = {
       name=s;
-      sdesc=Type_sym;
-      stype={typ=t; quals=[];};
-      storage=Nil_sto;
+      stype={typ=t; qual=Noq;};
+      stoclass=Typedef_sto;
       block=0;
     } in
     Hashtbl.add symtab s sym) builtin_types

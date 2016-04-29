@@ -32,7 +32,7 @@ type binary_op =
   | Bool_gt
   | Bool_gteq
 
-type store_spec =
+type storage_class =
   | Auto_sto
   | Extern_sto
   | Register_sto
@@ -41,24 +41,20 @@ type store_spec =
   | Nil_sto
 
 type type_qual =
-  | Const_qual
-  | Restrict_qual
-  | Volatile_qual
+  | Noq
+  | Constq
+  | Restrictq
+  | Volatileq
 
 type func_spec =
   | Inline_spec
   | Noreturn_spec
 
-type symbol_desc =
-  | Decl_sym
-  | Type_sym
-
 type symbol = 
   {
     name: string;
-    sdesc: symbol_desc;
     mutable stype: ctype; 
-    storage: store_spec;
+    stoclass: storage_class;
     block: int;
   }
 
@@ -116,7 +112,7 @@ and ctype_desc =
   (* Complex Types *)
   | Array_typ of ctype 
   | Pointer_typ of ctype
-  | Struct_typ
+  | Struct_typ of ctype list
   | Union_typ
   | Function_typ
   | Incomplete_typ
@@ -124,7 +120,7 @@ and ctype_desc =
 and ctype =
   {
     typ: ctype_desc;
-    quals: type_qual list;
+    qual: type_qual;
   } 
 
 and value =
@@ -141,7 +137,7 @@ and type_cons =
   | Func_hp of type_cons * ctype list
   | Array_hp of type_cons 
 
-let rec string_of_ctype {typ;quals}  = 
+let rec string_of_ctype {typ;qual}  = 
   match typ with
   | Unit_typ    -> "unit"
   | Int8_typ    -> "int8"
@@ -158,7 +154,7 @@ let rec string_of_ctype {typ;quals}  =
   | Rune_typ        -> "rune"
   | Array_typ t     -> string_of_ctype t ^ "[]"
   | Pointer_typ t   -> string_of_ctype t ^ "*"
-  | Struct_typ      -> "struct"
+  | Struct_typ _    -> "struct"
   | Union_typ       -> "union"
   | Function_typ    -> "function"
   | Incomplete_typ  -> "incomplete"

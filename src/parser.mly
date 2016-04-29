@@ -6,19 +6,24 @@ open Compile
 (* Stateful parsing for declaration_specifiers: Semantic information
  * has too little order to pass up from semantics actions. We would
  * need a 5 tuple. *)
-let curr_storage_spec = ref Ast.Nil_sto
 let curr_type_quals : (Ast.type_qual list ref) = ref [] 
+
 let lasttype = ref Decl.ctype_nil
+let lastclass = ref Ast.Nil_sto
+
+let tcstack : (Ast.ctype * Ast.storage_class) list ref = ref []
+
 let curr_func_specs : (Ast.func_spec list ref) = ref []
 
 let curr_decl_valid = ref true
 
 let reset_decl_state () =
-  curr_storage_spec := Ast.Nil_sto ;
+  lastclass := Ast.Nil_sto ;
   curr_type_quals := [] ;
   lasttype := Decl.ctype_nil ;
   curr_func_specs := [] ;
   curr_decl_valid := true 
+
 
 %}
 
@@ -65,12 +70,12 @@ xdecls
 
 xdecl
   : decl_specifiers SEMI { reset_decl_state () }
-  | decl_specifiers xdecllist SEMI { reset_decl_state () }
+  | decl_specifiers xdlist SEMI { reset_decl_state () }
   ;
 
 decl_specifiers
   : storage_specifier       
-    { curr_storage_spec := $1 }
+    { lastclass := $1 }
   | types          
     { lasttype := $1 ; () }
   | tqual          
@@ -78,8 +83,8 @@ decl_specifiers
   | func_specifier          
     { curr_func_specs := $1 :: !curr_func_specs }
   | decl_specifiers storage_specifier
-    { match !curr_storage_spec with
-      | Ast.Nil_sto -> curr_storage_spec := $2 
+    { match !lastclass with
+      | Ast.Nil_sto -> lastclass := $2 
       | _ -> 
         Errors.errorf errors (Location.curr_yacc $startpos) 
           "multiple storage classes in declaration specifiers" ; 
@@ -118,9 +123,9 @@ tname
   ;
 
 tqual
-  : CONST     { Ast.Const_qual } 
-  | RESTRICT  { Ast.Restrict_qual }
-  | VOLATILE  { Ast.Volatile_qual }
+  : CONST     { Ast.Constq } 
+  | RESTRICT  { Ast.Restrictq }
+  | VOLATILE  { Ast.Volatileq }
   ;
 
 tquals
@@ -132,20 +137,23 @@ func_specifier
   : INLINE { Ast.Inline_spec }
   ;
 
+/* LAST: Need to figure out how to store type information 
+   and the bridge between seeing a struct and declaring / defining one */
 complex
   : STRUCT IDENT
     { 
       let open Ast in
       let structid = "struct::" ^ $2 in
-      let sym = Decl.declare_incomplete structid in
+      let sym = Decl.tag structid in
       sym.stype
     }
     
-  | struct_head LBRACE struct_decls_opt RBRACE
+  | struct_head sbody 
     {
       let open Ast in
+      (*
       let nd = Struct ($1.name,$3) in
-      Decl.define_incomplete $1 nd ;
+      *Decl.define_incomplete $1 nd ;*)
       $1.stype
     }
   ;
@@ -154,55 +162,64 @@ struct_head
   : STRUCT 
     { 
       let structid = Decl.gen_anon_struct () in
-      Decl.declare_incomplete structid 
+      Decl.tag structid 
     }
   | STRUCT IDENT
     { 
       let structid = "struct::" ^ $2 in
-      Decl.declare_incomplete structid 
+      Decl.tag structid 
     } 
   ; 
 
-struct_decls_opt
+sbody
+  : LBRACE sbodyopen sdeclo RBRACE 
+    {
+      let ((lt,lc) :: t) = !tcstack in
+      lasttype := lt ;
+      lastclass := lc ;
+      tcstack := t ;
+      $3
+    }
+  ;
+
+sbodyopen
+  : /* empty */
+    {
+      tcstack := (!lasttype, !lastclass) :: !tcstack 
+    }
+  ;
+
+sdeclo
   : /* empty */   { [] }
-  | struct_decls  { $1 }
+  | sdecl  { $1 }
   ; 
 
-struct_decls
-  : struct_decl { [$1] }
-  | struct_decls struct_decl {$2 :: $1 }
+sdecl
+  : tclist sdlist SEMI { [$2] }
+  | sdecl tclist sdlist SEMI {$3 :: $1 }
   ;
 
-struct_decl
-  : specifier_qualifiers struct_declarator_opt SEMI { Ast.Nil }
-  ;
-
-specifier_qualifiers
+tclist
   : types { ([$1],[]) }
   | tqual { ([],[$1]) }
-  | specifier_qualifiers types
+  | tclist types
     { let (a,b) = $1 in ($2 :: a, b) }
-  | specifier_qualifiers tqual
+  | tclist tqual
     { let (a,b) = $1 in (a, $2 :: b) }
   ; 
 
-struct_declarator_opt
-  : /* empty */ { None }
-  | struct_declarators { Some $1 }
-  ; 
-
-struct_declarators
-  : struct_declarator { [$1] }
-  | struct_declarators COMMA struct_declarator { $3 :: $1 }
+sdlist
+  : sdeclor { [$1] }
+  | sdlist COMMA sdeclor { $3 :: $1 }
   ;
 
-struct_declarator
+sdeclor
   : xdeclor { $1 }
   ;
     
-xdecllist
-  : xdeclor                 { Decl.declare $1 !lasttype ; () }
-  | xdecllist COMMA xdeclor { Decl.declare $3 !lasttype ; () }
+xdlist
+  : xdeclor              { Decl.declare $1 !lasttype !lastclass ; () }
+  | xdlist COMMA xdeclor { Decl.declare $3 !lasttype !lastclass ; () }
   ;
 
 xdeclor

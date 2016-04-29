@@ -124,12 +124,12 @@ let reset_intlex () =
  * an int value and give it the default 'int' type *)
 let convert_int tag (sign, typ) value = 
   match tag with
-  | Decimal -> Intval (int_of_string value, {typ=Int32_typ; quals=[Const_qual]})
-  | Hexidecimal -> Intval (int_of_string ("0x" ^ value), {typ=Int32_typ; quals=[Const_qual]})
-  | Octal -> Intval (int_of_string ("0o" ^ value), {typ=Int32_typ; quals=[Const_qual]}) 
+  | Decimal -> Intval (int_of_string value, {typ=Int32_typ; qual=Constq})
+  | Hexidecimal -> Intval (int_of_string ("0x" ^ value), {typ=Int32_typ; qual=Constq})
+  | Octal -> Intval (int_of_string ("0o" ^ value), {typ=Int32_typ; qual=Constq}) 
 
 let convert_dec_float value =
-  Floatval (float_of_string value, {typ=Float32_typ; quals=[Const_qual]})
+  Floatval (float_of_string value, {typ=Float32_typ; qual=Constq})
 
 let convert_hex_float signf expn =
   let rec convert_hex_float' signf len i acc =
@@ -143,10 +143,10 @@ let convert_hex_float signf expn =
   let v = float_of_int (int_of_string ("0x" ^ l)) in
   let v' = convert_hex_float' r (String.length r) 0 v in
   if expn == "" then
-    Floatval (v', {typ=Float32_typ; quals=[Const_qual]})
+    Floatval (v', {typ=Float32_typ; qual=Constq})
   else
     let v'' = v' *. (2. ** float_of_int (int_of_string (Misc.chop expn))) in
-    Floatval (v'', {typ=Float32_typ; quals=[Const_qual];}) 
+    Floatval (v'', {typ=Float32_typ; qual=Constq;}) 
 
 let is_rune c =
   let byte = int_of_char c in
@@ -283,9 +283,9 @@ rule ltoken = parse
       with Not_found ->
         match (Decl.lookup_sym s) with
         | Some sym -> begin
-          match sym.sdesc with
-          | Type_sym  -> TYPE s
-          | _         -> IDENT s
+          match sym.stoclass with
+          | Typedef_sto  -> TYPE s
+          | _            -> IDENT s
           end
         | None -> IDENT s 
     }
