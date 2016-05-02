@@ -1,29 +1,18 @@
 /* The parser definition */
 %{
 
+open Ast
 open Compile
 
 (* Stateful parsing for declaration_specifiers: Semantic information
  * has too little order to pass up from semantics actions. We would
  * need a 5 tuple. *)
-let curr_type_quals : (Ast.type_qual list ref) = ref [] 
+let curr_type_quals : (type_qual list ref) = ref [] 
 
 let lasttype = ref Decl.ctype_nil
-let lastclass = ref Ast.Nil_sto
+let lastclass = ref Nil_sto
 
-let tcstack : (Ast.ctype * Ast.storage_class) list ref = ref []
-
-let curr_func_specs : (Ast.func_spec list ref) = ref []
-
-let curr_decl_valid = ref true
-
-let reset_decl_state () =
-  lastclass := Ast.Nil_sto ;
-  curr_type_quals := [] ;
-  lasttype := Decl.ctype_nil ;
-  curr_func_specs := [] ;
-  curr_decl_valid := true 
-
+let tcstack : (ctype * storage_class) list ref = ref []
 
 %}
 
@@ -69,40 +58,41 @@ xdecls
   ;
 
 xdecl
-  : decl_specifiers SEMI { reset_decl_state () }
-  | decl_specifiers xdlist SEMI { reset_decl_state () }
+  : tcqlist SEMI { () }
+  | tcqlist xdlist SEMI { () }
   ;
 
-decl_specifiers
-  : storage_specifier       
-    { lastclass := $1 }
-  | types          
-    { lasttype := $1 ; () }
-  | tqual          
-    { curr_type_quals := $1 :: !curr_type_quals }
-  | func_specifier          
-    { curr_func_specs := $1 :: !curr_func_specs }
-  | decl_specifiers storage_specifier
-    { match !lastclass with
-      | Ast.Nil_sto -> lastclass := $2 
-      | _ -> 
-        Errors.errorf errors (Location.curr_yacc $startpos) 
-          "multiple storage classes in declaration specifiers" ; 
-        curr_decl_valid := false } 
-  | decl_specifiers types
-    { lasttype := $2 ; () }
-  | decl_specifiers tqual
-    { curr_type_quals := $2 :: !curr_type_quals }
-  | decl_specifiers func_specifier
-    { curr_func_specs := $2 :: !curr_func_specs }
-  ;
-  
-storage_specifier
-  : EXTERN    { Ast.Extern_sto }
-  | STATIC    { Ast.Static_sto }
-  | AUTO      { Ast.Auto_sto }
-  | REGISTER  { Ast.Register_sto }
-  | TYPEDEF   { Ast.Typedef_sto }
+tcqlist 
+  : types 
+    { 
+      lasttype := $1
+    }
+  | cname 
+    { 
+      lastclass := $1
+    }
+  | qname { () }
+  | tcqlist types { () }
+  | tcqlist cname { () }
+  | tcqlist qname { () }
+  ; 
+
+tqlist
+  : types 
+    { 
+      lasttype := $1
+    }
+  | qname { () }
+  | tqlist types { () }
+  | tqlist qname { () }
+  ; 
+
+cname
+  : EXTERN    { Extern_sto }
+  | STATIC    { Static_sto }
+  | AUTO      { Auto_sto }
+  | REGISTER  { Register_sto }
+  | TYPEDEF   { Typedef_sto }
   ;
 
 types
@@ -113,7 +103,6 @@ types
 tname
   : TYPE          
     { 
-      let open Ast in
       let symopt = Decl.lookup_sym $1 in
       match symopt with
       | Some sym  -> sym.stype
@@ -122,27 +111,20 @@ tname
     }
   ;
 
-tqual
-  : CONST     { Ast.Constq } 
-  | RESTRICT  { Ast.Restrictq }
-  | VOLATILE  { Ast.Volatileq }
+qname
+  : CONST     { Constq } 
+  | RESTRICT  { Restrictq }
+  | VOLATILE  { Volatileq }
   ;
 
-tquals
-  : /* empty */   { [] }
-  | tquals tqual { $2 :: $1 }
+qlist
+  : /* empty */   { () }
+  | qlist qname   { () }
   ;
 
-func_specifier
-  : INLINE { Ast.Inline_spec }
-  ;
-
-/* LAST: Need to figure out how to store type information 
-   and the bridge between seeing a struct and declaring / defining one */
 complex
   : STRUCT IDENT
     { 
-      let open Ast in
       let structid = "struct::" ^ $2 in
       let sym = Decl.tag structid in
       sym.stype
@@ -150,10 +132,7 @@ complex
     
   | struct_head sbody 
     {
-      let open Ast in
-      (*
-      let nd = Struct ($1.name,$3) in
-      *Decl.define_incomplete $1 nd ;*)
+      Decl.define_struct $1 $2 ;
       $1.stype
     }
   ;
@@ -174,18 +153,22 @@ struct_head
 sbody
   : LBRACE sbodyopen sdeclo RBRACE 
     {
-      let ((lt,lc) :: t) = !tcstack in
-      lasttype := lt ;
-      lastclass := lc ;
-      tcstack := t ;
-      $3
+      Decl.pop_decls () ;
+      match !tcstack with
+      | ((lt,lc) :: t) ->
+        lasttype := lt ;
+        lastclass := lc ;
+        tcstack := t ;
+        List.rev $3
+      | [] -> raise (Misc.Internal_error "popping empty type stack") 
     }
   ;
 
 sbodyopen
   : /* empty */
     {
-      tcstack := (!lasttype, !lastclass) :: !tcstack 
+      tcstack := (!lasttype, !lastclass) :: !tcstack ;
+      Decl.mark_scope ()
     }
   ;
 
@@ -195,22 +178,21 @@ sdeclo
   ; 
 
 sdecl
-  : tclist sdlist SEMI { [$2] }
-  | sdecl tclist sdlist SEMI {$3 :: $1 }
+  : tqlist sdlist SEMI { $2 }
+  | sdecl tqlist sdlist SEMI { $3 @ $1 }
   ;
 
-tclist
-  : types { ([$1],[]) }
-  | tqual { ([],[$1]) }
-  | tclist types
-    { let (a,b) = $1 in ($2 :: a, b) }
-  | tclist tqual
-    { let (a,b) = $1 in (a, $2 :: b) }
-  ; 
-
 sdlist
-  : sdeclor { [$1] }
-  | sdlist COMMA sdeclor { $3 :: $1 }
+  : sdeclor 
+    { 
+      let sym = Decl.declare Decl.sdeclare $1 !lasttype !lastclass in
+      [(sym, sym.stype)]
+    }
+  | sdlist COMMA sdeclor 
+    {
+      let sym = Decl.declare Decl.sdeclare $3 !lasttype !lastclass in
+      (sym, sym.stype) :: $1
+    }
   ;
 
 sdeclor
@@ -218,20 +200,20 @@ sdeclor
   ;
     
 xdlist
-  : xdeclor              { Decl.declare $1 !lasttype !lastclass ; () }
-  | xdlist COMMA xdeclor { Decl.declare $3 !lasttype !lastclass ; () }
+  : xdeclor              { Decl.declare Decl.xdeclare $1 !lasttype !lastclass ; () }
+  | xdlist COMMA xdeclor { Decl.declare Decl.xdeclare $3 !lasttype !lastclass ; () }
   ;
 
 xdeclor
-  : STAR tquals xdeclor  { Ast.Pointer_hp $3 }
+  : STAR qlist xdeclor  { Pointer_hp $3 }
   | xdeclor2      { $1 }
   ; 
 
 xdeclor2
-  : IDENT                           { Ast.Name_hp $1 }
+  : IDENT                           { Name_hp $1 }
   | LPAREN xdeclor RPAREN           { $2 }
-  | xdeclor2 LPAREN arglist RPAREN  { Ast.Func_hp ($1,$3) }
-  | xdeclor2 LBRACK expr RBRACK     { Ast.Array_hp $1 }
+  | xdeclor2 LPAREN arglist RPAREN  { Func_hp ($1,$3) }
+  | xdeclor2 LBRACK expr RBRACK     { Array_hp $1 }
   ;
 
 arglist
@@ -239,12 +221,4 @@ arglist
   ;
 
 expr
-  : /* empty */ { Ast.Nil }
-  
-
-
-
-
-
-
-
+  : /* empty */ { Nil }

@@ -112,8 +112,8 @@ and ctype_desc =
   (* Complex Types *)
   | Array_typ of ctype 
   | Pointer_typ of ctype
-  | Struct_typ of ctype list
-  | Union_typ
+  | Struct_typ of symbol  * ((symbol * ctype) list)
+  | Union_typ of (symbol * ctype) list
   | Function_typ
   | Incomplete_typ
 
@@ -154,8 +154,9 @@ let rec string_of_ctype {typ;qual}  =
   | Rune_typ        -> "rune"
   | Array_typ t     -> string_of_ctype t ^ "[]"
   | Pointer_typ t   -> string_of_ctype t ^ "*"
-  | Struct_typ _    -> "struct"
-  | Union_typ       -> "union"
+  | Struct_typ 
+    (sym, _)     -> Printf.sprintf "struct %s" sym.name
+  | Union_typ _     -> "union"
   | Function_typ    -> "function"
   | Incomplete_typ  -> "incomplete"
 

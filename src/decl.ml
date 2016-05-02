@@ -17,22 +17,33 @@ let curr_anon = ref 0
 let gen_anon_struct () = 
   let id = Printf.sprintf "struct::%d" !curr_anon in
   curr_anon := !curr_anon + 1 ;
-  id
-
-let lookup_sym name =
-  try Some (Hashtbl.find symtab name)
-  with Not_found -> None
+  id 
 
 let push_decl sym =
   scopes := ((`Symbol sym) :: !scopes) 
+
+let mark_scope () =
+  curr_block := !curr_block + 1 ;
+  scopes := (`Mark :: !scopes)
 
 let push_sym sym =
   Hashtbl.add symtab sym.name sym ;
   push_decl sym 
 
-let mark_scope =
-  curr_block := !curr_block + 1 ;
-  scopes := (`Mark :: !scopes)
+let lookup_sym name =
+  try Some (Hashtbl.find symtab name)
+  with Not_found -> None
+
+let newsym name typ cls =
+  let sym = {
+    name=name;
+    stype=typ; 
+    stoclass=cls;
+    block= !curr_block;
+  } in
+  push_sym sym ; 
+  logf "declared %s with type %s" sym.name (string_of_ctype sym.stype); 
+  sym 
 
 let pop_decls () =
   if !curr_block == 0 then 
@@ -52,61 +63,73 @@ let pop_decls () =
 let tag name =
   let osym = lookup_sym name in
   match osym with
-  | None ->
-    let sym = {
-      name=name;
-      stype=ctype_nil; 
-      stoclass=Nil_sto;
-      block= !curr_block;
-    } in
-    push_sym sym ; 
-    sym
-  | Some sym ->
-    if sym.stype.typ = Incomplete_typ then
+  | None -> newsym name ctype_nil Nil_sto
+  | Some sym -> begin
+    match sym.stype.typ with 
+    | Incomplete_typ    -> sym
+    | Struct_typ (_,_)  -> sym
+    | _ ->
+      Errors.errorf errors Location.dummy "incompatible redeclaration of %s" sym.name ;
       sym
-    else
-      begin
-      Errors.errorf errors Location.dummy "incompatable redeclaration of %s" sym.name ;
-      sym
-      end
+  end
 
 let define_incomplete sym nd =
   if sym.stype.typ <> Incomplete_typ then
-    Errors.errorf errors Location.dummy "redefinition of symbol %s" sym.name
+    Errors.errorf errors Location.dummy "redefinition of %s" sym.name
   else
-    Printf.printf "defined %s\n" sym.name ; 
+    logf "defined %s" sym.name ; 
     sym.stype <- {typ=Incomplete_typ; qual=Noq}
 
-let rec declare dcl typ cls =
-  match dcl with
-  | Pointer_hp d  -> declare d {typ=Pointer_typ typ; qual=Noq} cls
-  | Array_hp d    -> declare d {typ=Array_typ typ; qual=Noq} cls
-  | Func_hp (d,_) -> declare d {typ=Function_typ; qual=Noq} cls
-  | Name_hp name  ->
-    let osym = lookup_sym name in
+let rec print_struct typ =
+  match typ with
+  | {typ=Struct_typ (s,t); qual=_} -> 
+    (Printf.sprintf "%s { " s.name) ^
+    (List.fold_right (fun (s,t) str -> Printf.sprintf "%s : " s.name ^ print_struct t ^ str) t "")
+    ^ " } "
+  | _ -> Printf.sprintf "%s " (string_of_ctype typ)
+
+let define_struct sym typs =
+  if sym.stype.typ <> Incomplete_typ then
+    Errors.errorf errors Location.dummy "redefinition of %s" sym.name
+  else
+    let structyp = Struct_typ (sym, typs) in
+    sym.stype <- {typ=structyp; qual=Noq; } ;
+    logf "Built %s"  (print_struct sym.stype) 
+
+let xdeclare name typ cls = 
+  let osym = lookup_sym name in
     match osym with
-    | None ->
-      let sym = {
-        name=name;
-        stype=typ; 
-        stoclass=cls;
-        block= !curr_block;
-      } in
-      push_sym sym ; 
-      Printf.printf "declared %s with type %s\n" sym.name (string_of_ctype sym.stype); 
-      sym
+    | None -> newsym name typ cls
     | Some sym ->
-      if sym.stype.typ = Incomplete_typ then
-        sym
+      if sym.block == !curr_block then 
+        if sym.stype.typ = Incomplete_typ then
+          sym
+        else begin
+          Errors.errorf errors Location.dummy "incompatible redeclaration of %s" sym.name ;
+          sym
+        end
       else
-        begin
-        Errors.errorf errors Location.dummy "incompatable redeclaration of %s" sym.name ;
+        newsym name typ cls 
+
+let sdeclare name typ cls = 
+  let osym = lookup_sym name in
+    match osym with
+    | None -> newsym name typ cls
+    | Some sym ->
+      if sym.block == !curr_block then begin
+        Errors.errorf errors Location.dummy "duplicate member %s" sym.name ;
         sym
         end
+      else
+        newsym name typ cls 
 
+let rec declare f dcl typ cls =
+  match dcl with
+  | Pointer_hp d  -> declare f d {typ=Pointer_typ typ; qual=Noq} cls
+  | Array_hp d    -> declare f d {typ=Array_typ typ; qual=Noq} cls
+  | Func_hp (d,_) -> declare f d {typ=Function_typ; qual=Noq} cls
+  | Name_hp name  -> f name typ cls 
     
-
-
     
 (* Setup symbol table for builtin types *)
 let builtin_types = [

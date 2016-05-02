@@ -31,3 +31,8 @@ struct A2 a2_1;
 
 struct A2 *a2_2;
 struct A2 *a2_3;
+
+struct A4 {
+  int x;
+};
+

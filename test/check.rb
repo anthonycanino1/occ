@@ -11,6 +11,15 @@ require 'ptools'
 $commands = {"compile" => "compile", "error" => "error", "run" => "run"}
 $occ = nil
 
+def clean_debug(output)
+  cleaned = ""
+  output.each_line do |l|
+    next if l.include?("[DEBUG]")
+    cleaned << l + "\n"
+  end
+  return cleaned
+end
+
 def get_command(line) 
   toks = line.split
   unless (toks[0] == "//" && !$commands[toks[1]].nil?) 
@@ -29,6 +38,7 @@ end
 # and no error.
 def do_compile_command(name, file)
   output, result = compile_file(name)
+  output = clean_debug(output)
   if (output != "" || result != 0)
     puts "----------------------------------------------------------------------"
     puts "BUG: %s failed to compile" % name
