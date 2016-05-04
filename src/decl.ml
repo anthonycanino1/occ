@@ -68,6 +68,7 @@ let tag name =
     match sym.stype.typ with 
     | Incomplete_typ    -> sym
     | Struct_typ (_,_)  -> sym
+    | Union_typ (_,_)  -> sym
     | _ ->
       Errors.errorf errors Location.dummy "incompatible redeclaration of %s" sym.name ;
       sym
@@ -80,19 +81,21 @@ let define_incomplete sym nd =
     logf "defined %s" sym.name ; 
     sym.stype <- {typ=Incomplete_typ; qual=Noq}
 
-let rec print_struct typ =
-  match typ with
-  | {typ=Struct_typ (s,t); qual=_} -> 
-    (Printf.sprintf "%s { " s.name) ^
-    (List.fold_right (fun (s,t) str -> Printf.sprintf "%s : " s.name ^ print_struct t ^ str) t "")
-    ^ " } "
-  | _ -> Printf.sprintf "%s " (string_of_ctype typ)
-
+(* TODO : Not sure how the common definition will emerge, but there is absolutely a cleaner
+ * way to do the "define". *)
 let define_struct sym typs =
   if sym.stype.typ <> Incomplete_typ then
     Errors.errorf errors Location.dummy "redefinition of %s" sym.name
   else
     let structyp = Struct_typ (sym, typs) in
+    sym.stype <- {typ=structyp; qual=Noq; } ;
+    logf "Built %s"  (print_struct sym.stype) 
+
+let define_union sym typs =
+  if sym.stype.typ <> Incomplete_typ then
+    Errors.errorf errors Location.dummy "redefinition of %s" sym.name
+  else
+    let structyp = Union_typ (sym, typs) in
     sym.stype <- {typ=structyp; qual=Noq; } ;
     logf "Built %s"  (print_struct sym.stype) 
 

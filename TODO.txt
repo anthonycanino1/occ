@@ -1,0 +1,1 @@
+(0) Re-evaluate symbols, does it make sense to handle them like Plan9/Go?

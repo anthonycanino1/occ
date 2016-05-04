@@ -113,7 +113,7 @@ and ctype_desc =
   | Array_typ of ctype 
   | Pointer_typ of ctype
   | Struct_typ of symbol  * ((symbol * ctype) list)
-  | Union_typ of (symbol * ctype) list
+  | Union_typ of symbol * (symbol * ctype) list
   | Function_typ
   | Incomplete_typ
 
@@ -197,3 +197,15 @@ let string_of_node nd =
   | Union (_,_) -> "Union"
   | Enum (_,_) -> "Enum"
   | Function (_,_,_,_) -> "Function" 
+
+let rec print_struct typ =
+  match typ with
+  | {typ=Struct_typ (s,t); qual=_} -> 
+    (Printf.sprintf "struct %s { " s.name) ^
+    (List.fold_right (fun (s,t) str -> Printf.sprintf "%s : " s.name ^ print_struct t ^ str) t "")
+    ^ " } "
+  | {typ=Union_typ (s,t); qual=_} -> 
+    (Printf.sprintf "union %s { " s.name) ^
+    (List.fold_right (fun (s,t) str -> Printf.sprintf "%s : " s.name ^ print_struct t ^ str) t "")
+    ^ " } "
+  | _ -> Printf.sprintf "%s " (string_of_ctype typ)

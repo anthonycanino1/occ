@@ -128,13 +128,24 @@ complex
       let structid = "struct::" ^ $2 in
       let sym = Decl.tag structid in
       sym.stype
-    }
-    
+    } 
   | struct_head sbody 
     {
       Decl.define_struct $1 $2 ;
       $1.stype
     }
+  | UNION IDENT
+    {
+      let structid = "struct::" ^ $2 in
+      let sym = Decl.tag structid in
+      sym.stype
+    }
+  | union_head sbody
+    {
+      Decl.define_union $1 $2 ;
+      $1.stype
+    }
+
   ;
 
 struct_head
@@ -144,6 +155,19 @@ struct_head
       Decl.tag structid 
     }
   | STRUCT IDENT
+    { 
+      let structid = "struct::" ^ $2 in
+      Decl.tag structid 
+    } 
+  ; 
+
+union_head
+  : UNION 
+    { 
+      let structid = Decl.gen_anon_struct () in
+      Decl.tag structid 
+    }
+  | UNION IDENT
     { 
       let structid = "struct::" ^ $2 in
       Decl.tag structid 
