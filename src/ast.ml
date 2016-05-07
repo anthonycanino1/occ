@@ -92,7 +92,7 @@ and node =
   | Struct of string * node list
   | Union of string option * node list
   | Enum of string option * node list
-  | Function of string * node * node list * node list
+  | Function of symbol * symbol list * node list
 
 and ctype_desc = 
   (* Builtin C Types *)
@@ -114,7 +114,7 @@ and ctype_desc =
   | Pointer_typ of ctype
   | Struct_typ of symbol  * ((symbol * ctype) list)
   | Union_typ of symbol * (symbol * ctype) list
-  | Function_typ
+  | Function_typ of ctype * (symbol * ctype) list
   | Incomplete_typ
 
 and ctype =
@@ -134,8 +134,9 @@ and value =
 and type_cons =
   | Name_hp of string
   | Pointer_hp of type_cons
-  | Func_hp of type_cons * ctype list
+  | Func_hp of type_cons * (symbol * ctype) list
   | Array_hp of type_cons 
+  | Proto_hp  
 
 let rec string_of_ctype {typ;qual}  = 
   match typ with
@@ -154,10 +155,11 @@ let rec string_of_ctype {typ;qual}  =
   | Rune_typ        -> "rune"
   | Array_typ t     -> string_of_ctype t ^ "[]"
   | Pointer_typ t   -> string_of_ctype t ^ "*"
-  | Struct_typ 
-    (sym, _)     -> Printf.sprintf "struct %s" sym.name
+  | Struct_typ (sym, _) -> Printf.sprintf "struct %s" sym.name
   | Union_typ _     -> "union"
-  | Function_typ    -> "function"
+  | Function_typ (t, typs) -> 
+      Printf.sprintf "%s function (%s)" (string_of_ctype t)
+      (List.fold_left (fun s (s',t) -> Printf.sprintf "%s,%s" s (string_of_ctype t)) "" typs)
   | Incomplete_typ  -> "incomplete"
 
 
@@ -196,7 +198,7 @@ let string_of_node nd =
   | Struct (_,_) -> "Struct"
   | Union (_,_) -> "Union"
   | Enum (_,_) -> "Enum"
-  | Function (_,_,_,_) -> "Function" 
+  | Function (_,_,_) -> "Function" 
 
 let rec print_struct typ =
   match typ with

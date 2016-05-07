@@ -9,10 +9,18 @@ open Compile
  * need a 5 tuple. *)
 let curr_type_quals : (type_qual list ref) = ref [] 
 
-let lasttype = ref Decl.ctype_nil
+let lasttype = ref Decl.nilctype
 let lastclass = ref Nil_sto
+let lastdecl = ref Decl.nilctype
+let lastdeclor = ref (Name_hp "")
+
+(* Not sure if I need this yet *)
+let lastdecl = ref 
 
 let tcstack : (ctype * storage_class) list ref = ref []
+
+(* Not very functional, not sure if I will keep *)
+let pxdecls : node list ref = ref []
 
 %}
 
@@ -44,6 +52,10 @@ let tcstack : (ctype * storage_class) list ref = ref []
 %token <string> IDENT 
 %token <string> TYPE
 
+%left SEMI
+%left COMMA
+%right LBRACK LPAREN
+
 %start implementation
 %type <unit> implementation
 
@@ -60,8 +72,15 @@ xdecls
 xdecl
   : tcqlist SEMI { () }
   | tcqlist xdlist SEMI { () }
+  | fdeclopen fbody 
+    { 
+      Decl.pop_decls () ;
+      let (Function (s, params, _)) = $1 in
+      let nd = Function (s, params, $2) in
+      pxdecls := nd :: !pxdecls
+    }
   ;
-
+  
 tcqlist 
   : types 
     { 
@@ -118,7 +137,7 @@ qname
   ;
 
 qlist
-  : /* empty */   { () }
+  : { () }
   | qlist qname   { () }
   ;
 
@@ -189,7 +208,7 @@ sbody
   ;
 
 sbodyopen
-  : /* empty */
+  : 
     {
       tcstack := (!lasttype, !lastclass) :: !tcstack ;
       Decl.mark_scope ()
@@ -197,7 +216,7 @@ sbodyopen
   ;
 
 sdeclo
-  : /* empty */   { [] }
+  : { [] }
   | sdecl  { $1 }
   ; 
 
@@ -209,13 +228,13 @@ sdecl
 sdlist
   : sdeclor 
     { 
-      let sym = Decl.declare Decl.sdeclare $1 !lasttype !lastclass in
-      [(sym, sym.stype)]
+      let st = Decl.declare Decl.sdeclare $1 !lasttype !lastclass in
+      [st]
     }
   | sdlist COMMA sdeclor 
     {
-      let sym = Decl.declare Decl.sdeclare $3 !lasttype !lastclass in
-      (sym, sym.stype) :: $1
+      let st = Decl.declare Decl.sdeclare $3 !lasttype !lastclass in
+      st :: $1
     }
   ;
 
@@ -233,6 +252,7 @@ xdeclor
   | xdeclor2      { $1 }
   ; 
 
+/* TODO : Need to make sure arglist obeys scoping */
 xdeclor2
   : IDENT                           { Name_hp $1 }
   | LPAREN xdeclor RPAREN           { $2 }
@@ -241,8 +261,110 @@ xdeclor2
   ;
 
 arglist
-  : TYPE { [] }
+  : arglistopen argdeclo 
+    { 
+      match !tcstack with
+      | ((lt,lc) :: t) ->
+        lasttype := lt ;
+        lastclass := lc ;
+        tcstack := t ;
+        List.rev $2
+      | [] -> raise (Misc.Internal_error "popping empty type stack") 
+    }
+  ;
+
+arglistopen
+  : 
+    {
+      tcstack := (!lasttype, !lastclass) :: !tcstack ;
+    }
+  ;
+
+argdeclo
+  : { [] }
+  | argdecl     { $1 }
+  ;
+
+argdecl
+  : argdecl1                { [$1] }
+  | argdecl COMMA argdecl1  { $3 :: $1 }
+  ;
+
+argdecl1
+  : tqlist
+    { (Decl.nilsym, !lasttype) }
+  | tqlist xdeclor 
+    {
+      Decl.declare Decl.nodeclare $2 !lasttype !lastclass 
+    }
+  | tqlist abdeclor
+    {
+      Decl.declare Decl.pdeclare $2 !lasttype !lastclass 
+    }
+  ; 
+
+abdeclor
+  : STAR qlist            { Pointer_hp (Proto_hp) }
+  | STAR qlist abdeclor   { Pointer_hp ($3) }
+  | abdeclor2             { $1 }
+  ;
+
+abdeclor2
+  : abdeclor3                        { $1 }
+  | abdeclor2 LPAREN arglist RPAREN  { Func_hp ($1,$3) }
+  | abdeclor2 LBRACK expr RBRACK     { Array_hp $1 }
+  ; 
+
+abdeclor3
+  : LPAREN RPAREN           { Func_hp (Proto_hp, []) }
+  | LBRACK expr RBRACK      { Array_hp (Proto_hp) } 
+  | LPAREN abdeclor RPAREN  { $2 }
+  ;
+
+/*
+pdeclo
+  : { [] }
+  | pdecl       { $1 }
+  ;
+
+pdecl
+  : tqlist pdeclor 
+    { 
+      let (_,typ) = Decl.declare Decl.sdeclare $2 !lasttype !lastclass in
+      [typ]
+    }
+  | pdecl COMMA tqlist pdeclor 
+    { 
+      let (_,typ) = Decl.declare Decl.sdeclare $4 !lasttype !lastclass in
+      typ :: $1
+    } 
+  ;
+  */
+
+pdeclor
+  : xdeclor { $1 }
+  ;
+
+fdeclopen
+  : tcqlist xdeclor 
+    {
+      let (s,t) = Decl.declare Decl.xdeclare $2 !lasttype !lastclass in
+      match t.typ with
+      | Function_typ (rtyp, ptyps) ->
+        Decl.mark_scope () ;
+        (* Push declarations back on the stack, its ugly *)
+        List.iter (fun (s',_) -> Decl.push_sym s') ptyps ;
+        let params = (List.fold_right (fun (s',_) ps -> s' :: ps) ptyps []) in
+        Function (s, params, [])
+      | _ ->
+        Errors.errorf errors Location.dummy "%s not a function" s.name ; 
+        Nil
+    }
+  ;
+
+fbody
+  : LBRACE RBRACE { [] }
   ;
 
 expr
-  : /* empty */ { Nil }
+  : { Nil }

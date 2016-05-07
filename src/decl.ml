@@ -5,7 +5,8 @@
 open Ast
 open Compile
 
-let ctype_nil = let open Ast in {typ=Incomplete_typ; qual=Noq;} 
+let nilctype = {typ=Incomplete_typ; qual=Noq;} 
+let nilsym = {name=""; stype=nilctype; stoclass=Nil_sto; block=0;}
 
 let symtab : (string, Ast.symbol) Hashtbl.t = Hashtbl.create 8 
 
@@ -63,7 +64,7 @@ let pop_decls () =
 let tag name =
   let osym = lookup_sym name in
   match osym with
-  | None -> newsym name ctype_nil Nil_sto
+  | None -> newsym name nilctype Nil_sto
   | Some sym -> begin
     match sym.stype.typ with 
     | Incomplete_typ    -> sym
@@ -126,13 +127,37 @@ let sdeclare name typ cls =
       else
         newsym name typ cls 
 
+let pdeclare name typ cls = 
+  let osym = lookup_sym name in
+    match osym with
+    | None -> newsym name typ cls
+    | Some sym ->
+      if sym.block == !curr_block then begin
+        Errors.errorf errors Location.dummy "duplicate member %s" sym.name ;
+        sym
+        end
+      else
+        newsym name typ cls 
+
+let nodeclare name typ cls = nilsym
+
+(* TODO : Still working out how I want this to work. Check the declares
+ * from parser. *)
 let rec declare f dcl typ cls =
   match dcl with
   | Pointer_hp d  -> declare f d {typ=Pointer_typ typ; qual=Noq} cls
   | Array_hp d    -> declare f d {typ=Array_typ typ; qual=Noq} cls
-  | Func_hp (d,_) -> declare f d {typ=Function_typ; qual=Noq} cls
-  | Name_hp name  -> f name typ cls 
-    
+  | Func_hp (d,typs) -> declare f d {typ=Function_typ (typ, typs); qual=Noq} cls
+  | Name_hp name  -> ((f name typ cls),typ)
+  | Proto_hp      -> (nilsym,typ)
+
+let rec findfname dcl =
+  match dcl with
+  | Pointer_hp d  -> findfname d 
+  | Array_hp d    -> findfname d 
+  | Func_hp (d,_) -> findfname d 
+  | Name_hp name  -> name
+  | Proto_hp      -> raise (Misc.Internal_error ("should never findfname and hit proto"))
     
 (* Setup symbol table for builtin types *)
 let builtin_types = [

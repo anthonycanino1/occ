@@ -2,11 +2,26 @@
 // Copyright 2016 The occ Authors. All rights reserved.
 // Test:
 
-int f1(void);
+int f1();
 
-void f2(int);
+int f2(void);
 
-int f3(int*);
+void f3(int x);
 
+int f4(int *x);
 
+int f5(int *x, int y, char **c);
+
+void f6(int);
+
+int f7(int *);
+
+int f8(int *, int, char **);
+
+// Some tougher ones
+void h1(int *[]);
+void h2(int (*)[]);
+void h3(int *());
+void h4(int (*)(void));
+void h5(int (*const [])(int));
 
