@@ -171,67 +171,6 @@ let simple_esc_code c =
 
 let simple_esc_char c = String.make 1 (simple_esc_code c)
   
-(*
-let dump_token t =
-  match t with
-  | (Parser.INTLIT (Ast.Intval (i,t))) -> Printf.printf "INTLIT:%d\n" i
-  | (Parser.FLOATLIT (Ast.Floatval (i,t))) -> Printf.printf "FLOATLIT:%f\n" i
-  | (Parser.STRLIT (Ast.Strval s)) -> Printf.printf "STRLIT:%s\n" s
-  | (Parser.RUNELIT (Ast.Runeval s)) -> Printf.printf "RUNELIT:%s\n" (Rune.to_string s)
-  | (Parser.CHARLIT (Ast.Charval s)) -> Printf.printf "CHARLIT:%s\n" s
-  | (Parser.IDENT s) -> Printf.printf "IDENT:%s\n" s
-  | (Parser.STRUCT) -> Printf.printf "STRUCT\n"
-  | Parser.LBRACK -> Printf.printf "LBRACK\n"
-  | Parser.RBRACK -> Printf.printf "RBRACK\n"
-  | Parser.LPAREN -> Printf.printf "LPAREN\n"
-  | Parser.RPAREN -> Printf.printf "RPAREN\n"
-  | Parser.LBRACE -> Printf.printf "LBRACE\n"
-  | Parser.RBRACE -> Printf.printf "RBRACE\n"
-  | Parser.DOT -> Printf.printf "DOT\n"
-  | Parser.DOTS -> Printf.printf "DOTS\n"
-  | Parser.COMMA -> Printf.printf "COMMA\n"
-  | Parser.SEMI -> Printf.printf "SEMI\n"
-  | Parser.ARROW -> Printf.printf "ARROW\n"
-  | Parser.INC-> Printf.printf "INC\n"
-  | Parser.DEC-> Printf.printf "DEC\n"
-  | Parser.AND-> Printf.printf "AND\n"
-  | Parser.STAR-> Printf.printf "STAR\n"
-  | Parser.PLUS-> Printf.printf "PLUS\n"
-  | Parser.MINUS-> Printf.printf "MINUS\n"
-  | Parser.NEG-> Printf.printf "NEG\n"
-  | Parser.BANG-> Printf.printf "BANG\n"
-  | Parser.DIV-> Printf.printf "DIV\n"
-  | Parser.MOD -> Printf.printf "MOD\n"
-  | Parser.XOR -> Printf.printf "XOR\n"
-  | Parser.OR -> Printf.printf "OR\n"
-  | Parser.LSHIFT-> Printf.printf "LSHIFT\n"
-  | Parser.RSHIFT-> Printf.printf "RSHIFT\n"
-  | Parser.LT -> Printf.printf "LT\n"
-  | Parser.GT -> Printf.printf "GT\n"
-  | Parser.LTEQ-> Printf.printf "LTEQ\n"
-  | Parser.GTEQ-> Printf.printf "GTEQ\n"
-  | Parser.EQEQ-> Printf.printf "EQEQ\n"
-  | Parser.NEQ-> Printf.printf "NEQ\n"
-  | Parser.ANDAND-> Printf.printf "ANDAND\n"
-  | Parser.OROR-> Printf.printf "OROR\n"
-  | Parser.TERNARY-> Printf.printf "TERNARY\n"
-  | Parser.COLON-> Printf.printf "COLON\n"
-  | Parser.EQ -> Printf.printf "EQ \n"
-  | Parser.PLUSEQ-> Printf.printf "PLUSEQ\n"
-  | Parser.MINUSEQ-> Printf.printf "MINUSEQ\n"
-  | Parser.MULTEQ-> Printf.printf "MULTEQ\n"
-  | Parser.DIVEQ-> Printf.printf "DIVEQ\n"
-  | Parser.MODEQ-> Printf.printf "MODEQ\n"
-  | Parser.LSHIFTEQ-> Printf.printf "LSHIFTEQ\n"
-  | Parser.RSHIFTEQ-> Printf.printf "RSHIFTEQ\n"
-  | Parser.ANDEQ-> Printf.printf "ANDEQ\n"
-  | Parser.OREQ-> Printf.printf "OREQ\n"
-  | Parser.XOREQ-> Printf.printf "XOREQ\n" 
-  | Parser.EOF -> Printf.printf "EOF\n" 
-  | _ -> Printf.printf "Unknown\n" 
-*)
-}
-
 let blank = [' ' '\t' '\n']
 let ident_start = ['A'-'Z' 'a'-'z' '_']
 let ident_char = ['A'-'Z' 'a'-'z' '_' '0'-'9']
